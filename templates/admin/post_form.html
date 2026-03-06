@@ -1,0 +1,214 @@
+{% extends "base.html" %}
+{% block title %}{% if post %}포스트 수정{% else %}포스트 등록{% endif %}{% endblock %}
+
+{% block nav_extra %}
+<div class="flex items-center gap-3 text-sm">
+    <a href="/admin/" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">대시보드</a>
+    <a href="/admin/posts" class="text-indigo-600 dark:text-indigo-400 font-medium">포스트</a>
+    <a href="/admin/blogs" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">블로그 소스</a>
+    <a href="/admin/logout" class="text-gray-400 hover:text-red-500">로그아웃</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">{% if post %}포스트 수정{% else %}포스트 등록{% endif %}</h1>
+
+    {% if error %}
+    <div class="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-4 text-sm">{{ error }}</div>
+    {% endif %}
+
+    <!-- URL 추출 (신규 등록 시만) -->
+    {% if not post %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+        <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">1. URL에서 메타데이터 추출</h2>
+        <div class="flex gap-2">
+            <input type="url" id="extract-url" placeholder="https://blog.example.com/post-url"
+                   class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <button type="button" id="btn-extract"
+                    class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 whitespace-nowrap">
+                추출
+            </button>
+        </div>
+        <p id="extract-status" class="text-xs text-gray-400 mt-2 hidden"></p>
+    </div>
+    {% endif %}
+
+    <!-- 포스트 폼 -->
+    <form method="post" action="{% if post %}/admin/posts/{{ post.id }}{% else %}/admin/posts{% endif %}"
+          class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 space-y-4">
+
+        <div>
+            <label class="block text-sm font-medium mb-1">블로그 소스 *</label>
+            <select name="blog_id" required
+                    class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                <option value="">선택하세요</option>
+                {% for blog in blogs %}
+                <option value="{{ blog.id }}" {% if post and post.blog_id == blog.id %}selected{% endif %}>{{ blog.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">제목 *</label>
+            <input type="text" name="title" id="field-title" required value="{{ post.title if post else '' }}"
+                   class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">원문 URL *</label>
+            <input type="url" name="original_url" id="field-url" required value="{{ post.original_url if post else '' }}"
+                   class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">작성자</label>
+                <input type="text" name="author" id="field-author" value="{{ post.author if post else '' }}"
+                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">발행일</label>
+                <input type="date" name="published_date" id="field-date" value="{{ post.published_date[:10] if post and post.published_date else '' }}"
+                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">카테고리</label>
+                <select name="category"
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    {% for cat in categories %}
+                    <option value="{{ cat }}" {% if post and post.category == cat %}selected{% endif %} class="capitalize">{{ cat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">이미지 URL</label>
+                <input type="url" name="image_url" id="field-image" value="{{ post.image_url if post else '' }}"
+                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">태그 (쉼표로 구분)</label>
+            <input type="text" name="tags" id="field-tags" value="{{ post.tags | join(', ') if post and post.tags else '' }}"
+                   placeholder="python, machine learning, tutorial"
+                   class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+            <div class="flex items-center justify-between mb-1">
+                <label class="text-sm font-medium">요약</label>
+                <button type="button" id="btn-summarize"
+                        class="px-3 py-1 text-xs bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    AI 요약 생성
+                </button>
+            </div>
+            <textarea name="summary" id="field-summary" rows="3"
+                      class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">{{ post.summary if post else '' }}</textarea>
+            <p id="summarize-status" class="text-xs text-gray-400 mt-1 hidden"></p>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">본문 (선택)</label>
+            <textarea name="full_content" id="field-content" rows="6"
+                      class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-xs">{{ post.full_content if post else '' }}</textarea>
+        </div>
+
+        <div class="flex items-center gap-3 pt-4">
+            <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+                {% if post %}수정{% else %}등록{% endif %}
+            </button>
+            <a href="/admin/posts" class="px-6 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400">취소</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// URL 메타데이터 추출
+const btnExtract = document.getElementById('btn-extract');
+if (btnExtract) {
+    btnExtract.addEventListener('click', async () => {
+        const url = document.getElementById('extract-url').value.trim();
+        if (!url) return;
+
+        const status = document.getElementById('extract-status');
+        status.textContent = '추출 중...';
+        status.classList.remove('hidden');
+        btnExtract.disabled = true;
+
+        try {
+            const resp = await fetch('/admin/posts/extract', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url})
+            });
+            const data = await resp.json();
+            if (data.error) {
+                status.textContent = data.error;
+                status.classList.add('text-red-500');
+                return;
+            }
+
+            document.getElementById('field-title').value = data.title || '';
+            document.getElementById('field-url').value = url;
+            document.getElementById('field-author').value = data.author || '';
+            document.getElementById('field-date').value = data.published_date || '';
+            document.getElementById('field-image').value = data.image_url || '';
+            document.getElementById('field-content').value = data.content || '';
+            status.textContent = '추출 완료';
+            status.classList.remove('text-red-500');
+            status.classList.add('text-green-500');
+        } catch (e) {
+            status.textContent = '추출 실패: ' + e.message;
+            status.classList.add('text-red-500');
+        } finally {
+            btnExtract.disabled = false;
+        }
+    });
+}
+
+// AI 요약 생성
+document.getElementById('btn-summarize').addEventListener('click', async () => {
+    const title = document.getElementById('field-title').value;
+    const content = document.getElementById('field-content').value;
+    if (!content) {
+        alert('본문 내용을 먼저 입력하세요.');
+        return;
+    }
+
+    const status = document.getElementById('summarize-status');
+    const btn = document.getElementById('btn-summarize');
+    status.textContent = '요약 생성 중...';
+    status.classList.remove('hidden');
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/admin/posts/summarize', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({title, content})
+        });
+        const data = await resp.json();
+        if (data.error) {
+            status.textContent = data.error;
+            status.classList.add('text-red-500');
+            return;
+        }
+        document.getElementById('field-summary').value = data.summary;
+        status.textContent = '요약 완료';
+        status.classList.remove('text-red-500');
+        status.classList.add('text-green-500');
+    } catch (e) {
+        status.textContent = '요약 실패: ' + e.message;
+        status.classList.add('text-red-500');
+    } finally {
+        btn.disabled = false;
+    }
+});
+</script>
+{% endblock %}

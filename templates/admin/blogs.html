@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}블로그 소스 관리{% endblock %}
+
+{% block nav_extra %}
+<div class="flex items-center gap-3 text-sm">
+    <a href="/admin/" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">대시보드</a>
+    <a href="/admin/posts" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">포스트</a>
+    <a href="/admin/blogs" class="text-indigo-600 dark:text-indigo-400 font-medium">블로그 소스</a>
+    <a href="/admin/logout" class="text-gray-400 hover:text-red-500">로그아웃</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">블로그 소스 관리</h1>
+
+{% if request.query_params.get('imported') %}
+<div class="bg-green-100 dark:bg-green-900 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg mb-4 text-sm">
+    CSV 가져오기 완료: {{ request.query_params.get('imported') }}건 등록, {{ request.query_params.get('skipped', '0') }}건 건너뜀 (URL 중복)
+</div>
+{% endif %}
+
+<!-- CSV 가져오기/내보내기 -->
+<div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+    <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">CSV 일괄 관리</h2>
+    <div class="flex flex-wrap items-end gap-4">
+        <form method="post" action="/admin/blogs/import" enctype="multipart/form-data" class="flex items-end gap-2">
+            <div>
+                <label class="block text-xs font-medium mb-1">CSV 파일 가져오기</label>
+                <input type="file" name="file" accept=".csv" required
+                       class="text-sm text-gray-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:bg-indigo-50 file:text-indigo-700 dark:file:bg-indigo-900 dark:file:text-indigo-300 hover:file:bg-indigo-100">
+            </div>
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 whitespace-nowrap">가져오기</button>
+        </form>
+        <div class="flex gap-2">
+            <a href="/admin/blogs/export" class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap">내보내기 (CSV)</a>
+            <a href="/admin/blogs/template" class="px-4 py-2 border border-gray-300 dark:border-gray-600 text-sm rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-500 whitespace-nowrap">템플릿 다운로드</a>
+        </div>
+    </div>
+    <p class="text-xs text-gray-400 mt-2">CSV 컬럼: name, url, feed_url, category, description (URL 중복 시 건너뜀)</p>
+</div>
+
+<!-- 블로그 추가 폼 -->
+<div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+    <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">블로그 추가</h2>
+    <form method="post" action="/admin/blogs" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+            <label class="block text-xs font-medium mb-1">블로그 이름 *</label>
+            <input type="text" name="name" required placeholder="Example Blog"
+                   class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-xs font-medium mb-1">URL *</label>
+            <input type="url" name="url" required placeholder="https://blog.example.com"
+                   class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-xs font-medium mb-1">RSS 피드 URL</label>
+            <input type="url" name="feed_url" placeholder="https://blog.example.com/rss"
+                   class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+            <label class="block text-xs font-medium mb-1">카테고리</label>
+            <select name="category"
+                    class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                {% for cat in categories %}
+                <option value="{{ cat }}" class="capitalize">{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="sm:col-span-2">
+            <label class="block text-xs font-medium mb-1">설명</label>
+            <input type="text" name="description" placeholder="블로그 설명 (선택)"
+                   class="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div class="sm:col-span-2">
+            <button type="submit" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">추가</button>
+        </div>
+    </form>
+</div>
+
+<!-- 블로그 목록 -->
+{% if blogs %}
+<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-gray-700">
+            <tr>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">이름</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">카테고리</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">포스트</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">상태</th>
+                <th class="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400">작업</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+            {% for blog in blogs %}
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
+                <td class="px-4 py-3">
+                    <a href="{{ blog.url }}" target="_blank" class="hover:text-indigo-600 dark:hover:text-indigo-400">{{ blog.name }}</a>
+                    {% if blog.description %}
+                    <p class="text-xs text-gray-400 mt-0.5">{{ blog.description }}</p>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 hidden sm:table-cell">
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 capitalize">{{ blog.category or "-" }}</span>
+                </td>
+                <td class="px-4 py-3 hidden md:table-cell text-gray-500">{{ blog.post_count }}</td>
+                <td class="px-4 py-3 hidden md:table-cell">
+                    {% if blog.active %}
+                    <span class="text-green-600 dark:text-green-400 text-xs">활성</span>
+                    {% else %}
+                    <span class="text-gray-400 text-xs">비활성</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        <form method="post" action="/admin/blogs/{{ blog.id }}/toggle">
+                            <button type="submit" class="text-xs {% if blog.active %}text-yellow-600 hover:text-yellow-700{% else %}text-green-600 hover:text-green-700{% endif %}">
+                                {% if blog.active %}비활성화{% else %}활성화{% endif %}
+                            </button>
+                        </form>
+                        <form method="post" action="/admin/blogs/{{ blog.id }}/delete" onsubmit="return confirm('삭제하시겠습니까?')">
+                            <button type="submit" class="text-red-500 hover:underline text-xs">삭제</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<div class="text-center py-12 text-gray-400">
+    등록된 블로그가 없습니다. 위 폼에서 블로그를 추가하세요.
+</div>
+{% endif %}
+{% endblock %}

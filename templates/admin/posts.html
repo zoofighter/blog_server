@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}포스트 관리{% endblock %}
+
+{% block nav_extra %}
+<div class="flex items-center gap-3 text-sm">
+    <a href="/admin/" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">대시보드</a>
+    <a href="/admin/posts" class="text-indigo-600 dark:text-indigo-400 font-medium">포스트</a>
+    <a href="/admin/blogs" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">블로그 소스</a>
+    <a href="/admin/logout" class="text-gray-400 hover:text-red-500">로그아웃</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="flex items-center justify-between mb-6">
+    <h1 class="text-2xl font-bold">포스트 관리 <span class="text-gray-400 text-lg font-normal">({{ total }})</span></h1>
+    <a href="/admin/posts/new" class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700">+ 등록</a>
+</div>
+
+{% if posts %}
+<div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden">
+    <table class="w-full text-sm">
+        <thead class="bg-gray-50 dark:bg-gray-750 border-b border-gray-200 dark:border-gray-700">
+            <tr>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400">제목</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden sm:table-cell">블로그</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">카테고리</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden md:table-cell">요약</th>
+                <th class="text-left px-4 py-3 font-medium text-gray-500 dark:text-gray-400 hidden lg:table-cell">날짜</th>
+                <th class="text-right px-4 py-3 font-medium text-gray-500 dark:text-gray-400">작업</th>
+            </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-100 dark:divide-gray-700">
+            {% for post in posts %}
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-750">
+                <td class="px-4 py-3">
+                    <a href="/admin/posts/{{ post.id }}/edit" class="hover:text-indigo-600 dark:hover:text-indigo-400 line-clamp-1">{{ post.title }}</a>
+                </td>
+                <td class="px-4 py-3 text-gray-500 dark:text-gray-400 hidden sm:table-cell">{{ post.blog_name or "-" }}</td>
+                <td class="px-4 py-3 hidden md:table-cell">
+                    <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 capitalize">{{ post.category or "-" }}</span>
+                </td>
+                <td class="px-4 py-3 hidden md:table-cell">
+                    {% if post.summary_status == 'completed' %}
+                    <span class="text-green-600 dark:text-green-400 text-xs">완료</span>
+                    {% elif post.summary_status == 'failed' %}
+                    <span class="text-red-600 dark:text-red-400 text-xs">실패</span>
+                    {% else %}
+                    <span class="text-gray-400 text-xs">대기</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3 text-gray-500 dark:text-gray-400 hidden lg:table-cell text-xs">{{ post.published_date or post.created_at[:10] if post.created_at else "" }}</td>
+                <td class="px-4 py-3 text-right">
+                    <div class="flex items-center justify-end gap-2">
+                        <a href="/admin/posts/{{ post.id }}/edit" class="text-indigo-600 dark:text-indigo-400 hover:underline text-xs">수정</a>
+                        <form method="post" action="/admin/posts/{{ post.id }}/delete" onsubmit="return confirm('삭제하시겠습니까?')">
+                            <button type="submit" class="text-red-500 hover:underline text-xs">삭제</button>
+                        </form>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% if total_pages > 1 %}
+<div class="flex justify-center gap-2 mt-6">
+    {% if page > 1 %}
+    <a href="/admin/posts?page={{ page - 1 }}" class="px-4 py-2 text-sm rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">이전</a>
+    {% endif %}
+    <span class="px-4 py-2 text-sm text-gray-500">{{ page }} / {{ total_pages }}</span>
+    {% if page < total_pages %}
+    <a href="/admin/posts?page={{ page + 1 }}" class="px-4 py-2 text-sm rounded-lg bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600">다음</a>
+    {% endif %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="text-center py-20 text-gray-400">
+    <p>등록된 포스트가 없습니다.</p>
+    <a href="/admin/posts/new" class="text-indigo-600 hover:underline text-sm mt-2 inline-block">첫 포스트를 등록하세요</a>
+</div>
+{% endif %}
+{% endblock %}

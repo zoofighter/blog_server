@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block nav_extra %}
+<div class="flex items-center gap-3 text-sm">
+    <a href="/admin/" class="text-indigo-600 dark:text-indigo-400 font-medium">대시보드</a>
+    <a href="/admin/posts" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">포스트</a>
+    <a href="/admin/blogs" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">블로그 소스</a>
+    <a href="/admin/logout" class="text-gray-400 hover:text-red-500">로그아웃</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">대시보드</h1>
+
+<!-- 통계 카드 -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">총 포스트</p>
+        <p class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{{ stats.total_posts }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">활성 블로그</p>
+        <p class="text-3xl font-bold text-green-600 dark:text-green-400">{{ stats.total_blogs }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">카테고리</p>
+        <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">{{ stats.by_category | length }}</p>
+    </div>
+</div>
+
+<!-- 카테고리별 분포 -->
+{% if stats.by_category %}
+<div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-8">
+    <h2 class="text-lg font-semibold mb-4">카테고리별 분포</h2>
+    <div class="space-y-3">
+        {% for cat in stats.by_category %}
+        <div class="flex items-center gap-3">
+            <span class="text-sm w-24 capitalize text-gray-600 dark:text-gray-400">{{ cat.category or "none" }}</span>
+            <div class="flex-1 bg-gray-100 dark:bg-gray-700 rounded-full h-6 overflow-hidden">
+                <div class="bg-indigo-500 h-full rounded-full flex items-center justify-end px-2"
+                     style="width: {{ (cat.count / stats.total_posts * 100) if stats.total_posts else 0 }}%">
+                    <span class="text-xs text-white font-medium">{{ cat.count }}</span>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- 최근 등록 -->
+{% if stats.recent_posts %}
+<div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+    <h2 class="text-lg font-semibold mb-4">최근 등록된 포스트</h2>
+    <div class="space-y-3">
+        {% for post in stats.recent_posts %}
+        <div class="flex items-center justify-between text-sm">
+            <a href="/admin/posts/{{ post.id }}/edit" class="hover:text-indigo-600 dark:hover:text-indigo-400 truncate flex-1 mr-4">{{ post.title }}</a>
+            <div class="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400 shrink-0">
+                <span class="capitalize">{{ post.category or "" }}</span>
+                <span>{{ post.created_at[:10] if post.created_at else "" }}</span>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-8">
+    <a href="/admin/posts/new" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
+        + 포스트 등록
+    </a>
+</div>
+{% endblock %}

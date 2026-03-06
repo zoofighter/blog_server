@@ -1,0 +1,43 @@
+# 블로그 애그리게이션 플랫폼 설정
+
+# 데이터베이스
+database:
+  path: "data/blog.db"
+
+# LLM 요약 설정
+llm:
+  provider: "openai"  # openai | claude | ollama | none
+
+  openai:
+    api_key: ""  # 환경변수 OPENAI_API_KEY 우선
+    model: "gpt-4o-mini"
+    temperature: 0.3
+    max_tokens: 200
+
+  claude:
+    api_key: ""  # 환경변수 ANTHROPIC_API_KEY 우선
+    model: "claude-haiku-4-5-20251001"
+    max_tokens: 200
+
+  ollama:
+    base_url: "http://localhost:11434"
+    model: "llama3"
+
+# 관리자 인증
+admin:
+  password: "0000"  # 환경변수 ADMIN_PASSWORD 우선
+
+# 서버 설정
+server:
+  host: "0.0.0.0"
+  port: 8000
+
+# 카테고리 정의
+categories:
+  - art
+  - ml
+  - programming
+  - data
+  - tech
+  - essay
+  - other
