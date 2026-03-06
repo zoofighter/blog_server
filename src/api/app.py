@@ -43,17 +43,6 @@ def create_app(config: dict) -> FastAPI:
         lifespan=lifespan,
     )
 
-    # HEAD → GET 변환 (헬스체크/프록시 호환)
-    class HeadMiddleware:
-        def __init__(self, app: ASGIApp):
-            self.app = app
-        async def __call__(self, scope: Scope, receive: Receive, send: Send):
-            if scope["type"] == "http" and scope["method"] == "HEAD":
-                scope["method"] = "GET"
-            await self.app(scope, receive, send)
-
-    app.add_middleware(HeadMiddleware)
-
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["*"],
@@ -63,6 +52,18 @@ def create_app(config: dict) -> FastAPI:
 
     secret_key = os.environ.get("SECRET_KEY", "blog-aggregator-secret-key-change-me")
     app.add_middleware(SessionMiddleware, secret_key=secret_key)
+
+    # HEAD → GET 변환 (헬스체크/프록시 호환)
+    # add_middleware는 마지막 추가가 가장 바깥 → 라우팅 전에 HEAD를 GET으로 변환
+    class HeadMiddleware:
+        def __init__(self, app: ASGIApp):
+            self.app = app
+        async def __call__(self, scope: Scope, receive: Receive, send: Send):
+            if scope["type"] == "http" and scope["method"] == "HEAD":
+                scope["method"] = "GET"
+            await self.app(scope, receive, send)
+
+    app.add_middleware(HeadMiddleware)
 
     app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
