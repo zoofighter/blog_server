@@ -29,7 +29,11 @@ def create_app(config: dict) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         logger.info("블로그 애그리게이션 서버 시작")
+        # 스케줄러 시작
+        from src.scheduler import start_scheduler, stop_scheduler
+        start_scheduler(repo, config)
         yield
+        stop_scheduler()
         logger.info("서버 종료")
 
     app = FastAPI(

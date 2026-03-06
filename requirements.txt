@@ -8,3 +8,5 @@ python-multipart>=0.0.9
 pyyaml>=6.0
 itsdangerous>=2.1
 lxml>=5.0
+feedparser>=6.0
+apscheduler>=3.10

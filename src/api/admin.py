@@ -13,6 +13,8 @@ from fastapi.responses import RedirectResponse, JSONResponse, StreamingResponse
 from src.services.extractor import extract_metadata
 from src.services.summarizer import summarize
 from src.services.classifier import classify_category, extract_tags
+from src.services.crawler import crawl_blog, crawl_all_blogs
+from src.services.feed_finder import find_feed_url
 
 logger = logging.getLogger(__name__)
 
@@ -73,9 +75,13 @@ async def dashboard(request: Request):
     repo = request.app.state.repo
     templates = request.app.state.templates
     stats = repo.get_stats()
+    crawl_stats = repo.get_crawl_stats()
+    recent_logs = repo.get_crawl_logs(limit=10)
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
         "stats": stats,
+        "crawl_stats": crawl_stats,
+        "recent_logs": recent_logs,
     })
 
 
@@ -399,3 +405,108 @@ async def toggle_blog(request: Request, blog_id: int):
     if blog:
         repo.update_blog(blog_id, active=0 if blog["active"] else 1)
     return RedirectResponse("/admin/blogs", status_code=302)
+
+
+# --- 크롤링 관리 ---
+
+@router.get("/crawl")
+@require_auth
+async def crawl_page(request: Request):
+    """크롤링 관리 페이지."""
+    repo = request.app.state.repo
+    templates = request.app.state.templates
+    blogs = repo.get_blogs_with_feed(active_only=False)
+    post_counts = repo.get_blog_post_counts()
+    for blog in blogs:
+        blog["post_count"] = post_counts.get(blog["id"], 0)
+    crawl_stats = repo.get_crawl_stats()
+    recent_logs = repo.get_crawl_logs(limit=30)
+
+    from src.scheduler import get_scheduler
+    scheduler = get_scheduler()
+    scheduler_running = scheduler is not None and scheduler.running if scheduler else False
+
+    return templates.TemplateResponse("admin/crawl.html", {
+        "request": request,
+        "blogs": blogs,
+        "crawl_stats": crawl_stats,
+        "recent_logs": recent_logs,
+        "scheduler_running": scheduler_running,
+    })
+
+
+@router.post("/crawl/all")
+@require_auth
+async def crawl_all(request: Request):
+    """모든 활성 블로그를 즉시 크롤링한다."""
+    repo = request.app.state.repo
+    config = request.app.state.config
+    result = await crawl_all_blogs(repo, config)
+    return RedirectResponse(
+        f"/admin/crawl?crawled={result['total_added']}&errors={result['errors']}",
+        status_code=302,
+    )
+
+
+@router.post("/crawl/{blog_id}")
+@require_auth
+async def crawl_single(request: Request, blog_id: int):
+    """단일 블로그를 즉시 크롤링한다."""
+    repo = request.app.state.repo
+    config = request.app.state.config
+    blog = repo.get_blog(blog_id)
+    if not blog:
+        return RedirectResponse("/admin/crawl", status_code=302)
+
+    result = await crawl_blog(blog, repo, config)
+
+    status = "success" if result["error"] is None else "failed"
+    repo.create_crawl_log(
+        blog_id=blog_id,
+        status=status,
+        posts_found=result["posts_found"],
+        posts_added=result["posts_added"],
+        error_message=result["error"],
+    )
+    repo.update_blog_crawl_status(blog_id, error=result["error"])
+
+    return RedirectResponse(
+        f"/admin/crawl?crawled={result['posts_added']}&blog={blog['name']}",
+        status_code=302,
+    )
+
+
+@router.post("/blogs/{blog_id}/find-feed")
+@require_auth
+async def find_blog_feed(request: Request, blog_id: int):
+    """블로그의 RSS 피드 URL을 자동 탐색한다."""
+    repo = request.app.state.repo
+    blog = repo.get_blog(blog_id)
+    if not blog:
+        return JSONResponse({"error": "블로그를 찾을 수 없습니다."}, status_code=404)
+
+    feed_url = await find_feed_url(blog["url"])
+    if feed_url:
+        repo.update_blog(blog_id, feed_url=feed_url)
+        return JSONResponse({"feed_url": feed_url})
+    else:
+        return JSONResponse({"error": "피드 URL을 찾을 수 없습니다."}, status_code=404)
+
+
+@router.post("/blogs/find-all-feeds")
+@require_auth
+async def find_all_feeds(request: Request):
+    """피드 URL이 없는 모든 블로그의 피드를 탐색한다."""
+    repo = request.app.state.repo
+    blogs = repo.get_all_blogs(active_only=True)
+
+    found = 0
+    for blog in blogs:
+        if blog.get("feed_url"):
+            continue
+        feed_url = await find_feed_url(blog["url"])
+        if feed_url:
+            repo.update_blog(blog["id"], feed_url=feed_url)
+            found += 1
+
+    return RedirectResponse(f"/admin/crawl?feeds_found={found}", status_code=302)

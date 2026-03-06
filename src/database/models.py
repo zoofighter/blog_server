@@ -63,6 +63,28 @@ def init_db(db_path: str) -> None:
             FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
             FOREIGN KEY (tag_id) REFERENCES tags(id) ON DELETE CASCADE
         );
+
+        CREATE TABLE IF NOT EXISTS crawl_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            blog_id INTEGER,
+            status TEXT NOT NULL,
+            posts_found INTEGER DEFAULT 0,
+            posts_added INTEGER DEFAULT 0,
+            error_message TEXT,
+            crawled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (blog_id) REFERENCES blogs(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_crawl_logs_blog ON crawl_logs(blog_id);
+        CREATE INDEX IF NOT EXISTS idx_crawl_logs_at ON crawl_logs(crawled_at DESC);
     """)
+
+    # blogs 테이블에 크롤링 관련 컬럼 추가 (이미 존재하면 무시)
+    for col in ["last_crawled_at", "crawl_error"]:
+        try:
+            conn.execute(f"ALTER TABLE blogs ADD COLUMN {col} TEXT")
+        except Exception:
+            pass
+
     conn.commit()
     conn.close()

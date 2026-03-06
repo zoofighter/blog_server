@@ -6,7 +6,7 @@ database:
 
 # LLM 요약 설정
 llm:
-  provider: "openai"  # openai | claude | ollama | none
+  provider: "none"  # openai | claude | ollama | none
 
   openai:
     api_key: ""  # 환경변수 OPENAI_API_KEY 우선
@@ -31,6 +31,11 @@ admin:
 server:
   host: "0.0.0.0"
   port: 8000
+
+# RSS 크롤링 스케줄러
+scheduler:
+  enabled: true           # false로 설정 시 자동 크롤링 비활성화
+  interval_hours: 3       # 크롤링 간격 (시간)
 
 # 카테고리 정의
 categories:

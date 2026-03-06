@@ -257,6 +257,88 @@ class Repository:
         conn.close()
         return [dict(r) for r in rows]
 
+    # --- crawl logs ---
+
+    def create_crawl_log(self, blog_id: int, status: str,
+                         posts_found: int = 0, posts_added: int = 0,
+                         error_message: str = None) -> int:
+        conn = self._conn()
+        cursor = conn.execute(
+            """INSERT INTO crawl_logs (blog_id, status, posts_found, posts_added, error_message)
+               VALUES (?, ?, ?, ?, ?)""",
+            (blog_id, status, posts_found, posts_added, error_message),
+        )
+        log_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return log_id
+
+    def get_crawl_logs(self, blog_id: int = None, limit: int = 50) -> list[dict]:
+        conn = self._conn()
+        if blog_id:
+            rows = conn.execute(
+                """SELECT cl.*, b.name as blog_name
+                   FROM crawl_logs cl
+                   LEFT JOIN blogs b ON cl.blog_id = b.id
+                   WHERE cl.blog_id = ?
+                   ORDER BY cl.crawled_at DESC LIMIT ?""",
+                (blog_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT cl.*, b.name as blog_name
+                   FROM crawl_logs cl
+                   LEFT JOIN blogs b ON cl.blog_id = b.id
+                   ORDER BY cl.crawled_at DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def get_blogs_with_feed(self, active_only: bool = True) -> list[dict]:
+        """피드 URL이 있는 활성 블로그 목록을 반환한다."""
+        conn = self._conn()
+        conditions = ["feed_url IS NOT NULL", "feed_url != ''"]
+        if active_only:
+            conditions.append("active = 1")
+        where = " AND ".join(conditions)
+        rows = conn.execute(
+            f"SELECT * FROM blogs WHERE {where} ORDER BY name"
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def update_blog_crawl_status(self, blog_id: int, error: str = None) -> None:
+        conn = self._conn()
+        conn.execute(
+            "UPDATE blogs SET last_crawled_at = CURRENT_TIMESTAMP, crawl_error = ? WHERE id = ?",
+            (error, blog_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def get_crawl_stats(self) -> dict:
+        conn = self._conn()
+        total_with_feed = conn.execute(
+            "SELECT COUNT(*) FROM blogs WHERE feed_url IS NOT NULL AND feed_url != '' AND active = 1"
+        ).fetchone()[0]
+        last_24h = conn.execute(
+            "SELECT COUNT(*) FROM crawl_logs WHERE crawled_at > datetime('now', '-1 day')"
+        ).fetchone()[0]
+        success_24h = conn.execute(
+            "SELECT COUNT(*) FROM crawl_logs WHERE status = 'success' AND crawled_at > datetime('now', '-1 day')"
+        ).fetchone()[0]
+        posts_added_24h = conn.execute(
+            "SELECT COALESCE(SUM(posts_added), 0) FROM crawl_logs WHERE crawled_at > datetime('now', '-1 day')"
+        ).fetchone()[0]
+        conn.close()
+        return {
+            "total_with_feed": total_with_feed,
+            "crawls_24h": last_24h,
+            "success_24h": success_24h,
+            "posts_added_24h": posts_added_24h,
+        }
+
     # --- stats ---
 
     def get_stats(self) -> dict:

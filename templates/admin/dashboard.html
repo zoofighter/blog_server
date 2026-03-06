@@ -6,6 +6,7 @@
     <a href="/admin/" class="text-indigo-600 dark:text-indigo-400 font-medium">대시보드</a>
     <a href="/admin/posts" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">포스트</a>
     <a href="/admin/blogs" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">블로그 소스</a>
+    <a href="/admin/crawl" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">크롤링</a>
     <a href="/admin/logout" class="text-gray-400 hover:text-red-500">로그아웃</a>
 </div>
 {% endblock %}
@@ -14,7 +15,7 @@
 <h1 class="text-2xl font-bold mb-6">대시보드</h1>
 
 <!-- 통계 카드 -->
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8">
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
         <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">총 포스트</p>
         <p class="text-3xl font-bold text-indigo-600 dark:text-indigo-400">{{ stats.total_posts }}</p>
@@ -24,8 +25,12 @@
         <p class="text-3xl font-bold text-green-600 dark:text-green-400">{{ stats.total_blogs }}</p>
     </div>
     <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
-        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">카테고리</p>
-        <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">{{ stats.by_category | length }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">피드 등록</p>
+        <p class="text-3xl font-bold text-amber-600 dark:text-amber-400">{{ crawl_stats.total_with_feed }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">24h 수집</p>
+        <p class="text-3xl font-bold text-cyan-600 dark:text-cyan-400">+{{ crawl_stats.posts_added_24h }}</p>
     </div>
 </div>
 
