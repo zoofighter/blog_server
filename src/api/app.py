@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from starlette.middleware.sessions import SessionMiddleware
+from starlette.types import ASGIApp, Receive, Scope, Send
 
 from src.database.models import get_db_path, init_db
 from src.database.repository import Repository
@@ -41,6 +42,17 @@ def create_app(config: dict) -> FastAPI:
         version="1.0.0",
         lifespan=lifespan,
     )
+
+    # HEAD → GET 변환 (헬스체크/프록시 호환)
+    class HeadMiddleware:
+        def __init__(self, app: ASGIApp):
+            self.app = app
+        async def __call__(self, scope: Scope, receive: Receive, send: Send):
+            if scope["type"] == "http" and scope["method"] == "HEAD":
+                scope["method"] = "GET"
+            await self.app(scope, receive, send)
+
+    app.add_middleware(HeadMiddleware)
 
     app.add_middleware(
         CORSMiddleware,

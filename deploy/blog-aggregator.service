@@ -6,9 +6,8 @@ After=network.target
 Type=simple
 User=ubuntu
 WorkingDirectory=/opt/blog-aggregator
-Environment="ADMIN_PASSWORD=your-secure-password"
-Environment="OPENAI_API_KEY=your-openai-key"
-Environment="SECRET_KEY=your-random-secret-key"
+Environment="ADMIN_PASSWORD=change-me"
+Environment="SECRET_KEY=change-me-random-string"
 ExecStart=/opt/blog-aggregator/venv/bin/uvicorn main:app --host 127.0.0.1 --port 8000
 Restart=always
 RestartSec=5
