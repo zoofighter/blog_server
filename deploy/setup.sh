@@ -42,7 +42,13 @@ systemctl enable blog-aggregator
 systemctl start blog-aggregator
 
 echo "=== 8. iptables 방화벽 설정 (포트 80 오픈) ==="
-iptables -I INPUT 6 -m state --state NEW -p tcp --dport 80 -j ACCEPT
+# REJECT 규칙 앞에 삽입해야 함 (Oracle Cloud 기본 iptables에 REJECT 존재)
+REJECT_LINE=$(iptables -L INPUT --line-numbers -n | grep REJECT | head -1 | awk '{print $1}')
+if [ -n "$REJECT_LINE" ]; then
+    iptables -I INPUT "$REJECT_LINE" -p tcp --dport 80 -j ACCEPT
+else
+    iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+fi
 netfilter-persistent save 2>/dev/null || iptables-save > /etc/iptables/rules.v4 2>/dev/null || true
 
 echo ""

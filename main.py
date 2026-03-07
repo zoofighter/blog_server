@@ -13,7 +13,14 @@ def load_config(path: str = "config.yaml") -> dict:
 
 
 config = load_config()
-app = create_app(config)
+_fastapi_app = create_app(config)
+
+
+async def app(scope, receive, send):
+    """HEAD → GET 변환 래퍼. Nginx 헬스체크 호환."""
+    if scope["type"] == "http" and scope["method"] == "HEAD":
+        scope["method"] = "GET"
+    await _fastapi_app(scope, receive, send)
 
 if __name__ == "__main__":
     server = config.get("server", {})
