@@ -1,10 +1,13 @@
 #!/bin/bash
-# Oracle Cloud 서버 초기 셋업 스크립트
-# 사용법: sudo bash setup.sh
+# 서버 초기 셋업 스크립트 (Oracle Cloud / GCP 공용)
+# 사용법: sudo bash setup.sh [사용자명]
+# 예시:   sudo bash setup.sh          ← SUDO_USER 자동 감지
+#         sudo bash setup.sh boon     ← 수동 지정
 set -e
 
 APP_DIR="/opt/blog-aggregator"
-APP_USER="ubuntu"
+APP_USER="${1:-${SUDO_USER:-ubuntu}}"
+echo ">>> 앱 사용자: $APP_USER"
 
 echo "=== 1. 시스템 패키지 업데이트 ==="
 apt update && apt upgrade -y
@@ -20,7 +23,8 @@ apt install -y nginx
 
 echo "=== 4. 프로젝트 디렉토리 설정 ==="
 mkdir -p $APP_DIR
-chown $APP_USER:$APP_USER $APP_DIR
+mkdir -p $APP_DIR/data
+chown -R $APP_USER:$APP_USER $APP_DIR
 
 echo "=== 5. Python 가상환경 생성 및 의존성 설치 ==="
 sudo -u $APP_USER python3.11 -m venv $APP_DIR/venv
@@ -37,6 +41,8 @@ systemctl enable nginx
 
 echo "=== 7. systemd 서비스 등록 ==="
 cp $APP_DIR/deploy/blog-aggregator.service /etc/systemd/system/
+# 서비스 파일의 User를 실제 사용자로 변경
+sed -i "s/^User=.*/User=$APP_USER/" /etc/systemd/system/blog-aggregator.service
 systemctl daemon-reload
 systemctl enable blog-aggregator
 systemctl start blog-aggregator
