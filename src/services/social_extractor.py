@@ -7,6 +7,7 @@ from urllib.parse import urljoin
 
 import httpx
 from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright
 
 logger = logging.getLogger(__name__)
 
@@ -101,46 +102,51 @@ async def _extract_twitter(url: str, handle: str) -> dict:
 
 
 async def _extract_threads(url: str, handle: str) -> dict:
-    """Threads 페이지를 fetch하여 OG 태그로 메타데이터를 추출한다."""
-    headers = {"User-Agent": "Mozilla/5.0 (compatible; BlogAggregator/1.0)"}
-
-    async with httpx.AsyncClient(follow_redirects=True, timeout=15.0) as client:
-        resp = await client.get(url, headers=headers)
-        resp.raise_for_status()
-
-    soup = BeautifulSoup(resp.text, "lxml")
-
-    og_desc = soup.find("meta", property="og:description")
-    content = og_desc["content"].strip() if og_desc and og_desc.get("content") else ""
-
-    # 로그인 페이지 감지 — 실제 콘텐츠가 아님
-    if "log in" in content.lower() or "join threads" in content.lower():
-        content = ""
-
-    og_image = soup.find("meta", property="og:image")
-    image_url = ""
-    if og_image and og_image.get("content"):
-        img = og_image["content"].strip()
-        # 로그인 페이지 기본 이미지 제외
-        if "cdninstagram.com/rsrc.php" not in img:
-            if img.startswith("//"):
-                image_url = "https:" + img
-            elif img.startswith("/"):
-                image_url = urljoin(url, img)
-            else:
-                image_url = img
-
-    og_title = soup.find("meta", property="og:title")
+    """Playwright 헤드리스 브라우저로 Threads 포스트 메타데이터를 추출한다."""
+    content = ""
     author_name = ""
-    if og_title and og_title.get("content"):
-        title = og_title["content"].strip()
-        # 로그인 페이지 제목 제외
-        if "log in" not in title.lower():
-            m = re.match(r"^(.+?)\s*\(", title)
-            if m:
-                author_name = m.group(1).strip()
-            else:
-                author_name = title
+    image_url = ""
+
+    async with async_playwright() as p:
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page(
+            user_agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                       "AppleWebKit/537.36 (KHTML, like Gecko) "
+                       "Chrome/131.0.0.0 Safari/537.36",
+        )
+        try:
+            await page.goto(url, wait_until="networkidle", timeout=30000)
+
+            # --- 본문 텍스트 (렌더링된 DOM에서 직접 추출) ---
+            text_el = await page.query_selector(
+                '[data-pressable-container] div[dir="auto"]'
+            )
+            if text_el:
+                content = (await text_el.text_content() or "").strip()
+
+            # --- 작성자 이름 (핸들 기반 프로필 링크에서) ---
+            clean_handle = handle.lstrip("@")
+            name_el = await page.query_selector(
+                f'a[href*="/@{clean_handle}"] span'
+            )
+            if name_el:
+                author_name = (await name_el.text_content() or "").strip()
+
+            # --- 포스트 이미지 (프로필 사진 제외) ---
+            imgs = await page.query_selector_all("img")
+            for img in imgs:
+                src = await img.get_attribute("src") or ""
+                alt = await img.get_attribute("alt") or ""
+                if (
+                    "cdninstagram.com" in src
+                    and "rsrc.php" not in src
+                    and "s150x150" not in src
+                    and "profile" not in alt.lower()
+                ):
+                    image_url = src
+                    break
+        finally:
+            await browser.close()
 
     return {
         "platform": "threads",

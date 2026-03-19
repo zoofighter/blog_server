@@ -51,8 +51,13 @@
 </div>
 
 <!-- URL 일괄 크롤링 -->
-<div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+<div id="bulk-crawl" class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6 {% if request.query_params.get('handle') %}ring-2 ring-indigo-500{% endif %}">
     <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">URL 일괄 크롤링</h2>
+    {% if request.query_params.get('handle') %}
+    <div class="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 px-4 py-3 rounded-lg mb-3 text-sm">
+        <strong>{{ request.query_params.get('account', request.query_params.get('handle')) }}</strong> 계정의 포스트 URL을 아래에 붙여넣고 "일괄 추출"을 눌러주세요.
+    </div>
+    {% endif %}
     <form method="post" action="/admin/social/crawl">
         <textarea name="urls" rows="4" placeholder="Twitter/Threads URL을 한 줄에 하나씩 입력하세요&#10;https://x.com/username/status/123&#10;https://www.threads.net/@username/post/abc"
                   class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm mb-2"></textarea>
