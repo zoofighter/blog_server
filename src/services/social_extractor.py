@@ -38,18 +38,41 @@ def _extract_handle_from_url(url: str, platform: str) -> str:
     return ""
 
 
+def _base_metadata(url: str) -> dict:
+    """URL에서 파싱 가능한 최소 메타데이터를 반환한다."""
+    platform = detect_platform(url) or ""
+    handle = _extract_handle_from_url(url, platform) if platform else ""
+    return {
+        "platform": platform,
+        "original_url": url,
+        "author_handle": handle,
+        "author_name": "",
+        "content": "",
+        "image_url": "",
+        "embed_html": "",
+        "posted_date": "",
+    }
+
+
 async def extract_social_metadata(url: str) -> dict:
-    """소셜 포스트 URL에서 메타데이터를 추출한다."""
+    """소셜 포스트 URL에서 메타데이터를 추출한다.
+
+    추출 실패 시에도 URL 기반 최소 정보를 반환한다 (exception 없음).
+    """
     platform = detect_platform(url)
     if not platform:
         raise ValueError("지원하지 않는 플랫폼입니다. (Twitter/Threads만 지원)")
 
     handle = _extract_handle_from_url(url, platform)
 
-    if platform == "twitter":
-        return await _extract_twitter(url, handle)
-    else:
-        return await _extract_threads(url, handle)
+    try:
+        if platform == "twitter":
+            return await _extract_twitter(url, handle)
+        else:
+            return await _extract_threads(url, handle)
+    except Exception as e:
+        logger.warning("메타데이터 추출 실패 [%s]: %s — 기본 정보로 등록", url, e)
+        return _base_metadata(url)
 
 
 async def _extract_twitter(url: str, handle: str) -> dict:
@@ -90,27 +113,34 @@ async def _extract_threads(url: str, handle: str) -> dict:
     og_desc = soup.find("meta", property="og:description")
     content = og_desc["content"].strip() if og_desc and og_desc.get("content") else ""
 
+    # 로그인 페이지 감지 — 실제 콘텐츠가 아님
+    if "log in" in content.lower() or "join threads" in content.lower():
+        content = ""
+
     og_image = soup.find("meta", property="og:image")
     image_url = ""
     if og_image and og_image.get("content"):
         img = og_image["content"].strip()
-        if img.startswith("//"):
-            image_url = "https:" + img
-        elif img.startswith("/"):
-            image_url = urljoin(url, img)
-        else:
-            image_url = img
+        # 로그인 페이지 기본 이미지 제외
+        if "cdninstagram.com/rsrc.php" not in img:
+            if img.startswith("//"):
+                image_url = "https:" + img
+            elif img.startswith("/"):
+                image_url = urljoin(url, img)
+            else:
+                image_url = img
 
     og_title = soup.find("meta", property="og:title")
     author_name = ""
     if og_title and og_title.get("content"):
-        # "Username (@handle) on Threads" 형태에서 이름 추출
         title = og_title["content"].strip()
-        m = re.match(r"^(.+?)\s*\(", title)
-        if m:
-            author_name = m.group(1).strip()
-        else:
-            author_name = title
+        # 로그인 페이지 제목 제외
+        if "log in" not in title.lower():
+            m = re.match(r"^(.+?)\s*\(", title)
+            if m:
+                author_name = m.group(1).strip()
+            else:
+                author_name = title
 
     return {
         "platform": "threads",
