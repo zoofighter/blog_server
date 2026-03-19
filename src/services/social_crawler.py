@@ -254,101 +254,15 @@ async def _crawl_twitter_via_html(instance: str, account: dict,
 
 # --- Threads ---
 
-_THREADS_USER_AGENTS = [
-    # Googlebot — Meta serves SSR HTML for search engine crawlers
-    "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)",
-    # Regular browser
-    HEADERS["User-Agent"],
-]
-
-
-def _find_threads_post_urls(html: str, handle: str) -> set:
-    """HTML 전체에서 Threads 포스트 URL을 regex로 추출한다."""
-    escaped = re.escape(handle)
-    post_urls = set()
-
-    # 절대 URL 패턴
-    for m in re.finditer(
-        rf'https?://(?:www\.)?threads\.net/@{escaped}/post/([A-Za-z0-9_-]+)',
-        html,
-    ):
-        post_urls.add(f"https://www.threads.net/@{handle}/post/{m.group(1)}")
-
-    # 상대 경로 패턴 (JSON/script 내)
-    for m in re.finditer(
-        rf'/@{escaped}/post/([A-Za-z0-9_-]+)', html,
-    ):
-        post_urls.add(f"https://www.threads.net/@{handle}/post/{m.group(1)}")
-
-    return post_urls
-
-
 async def _crawl_threads_account(account: dict, repo: Repository,
                                  config: dict) -> dict:
-    """Threads 계정 크롤링: 프로필 HTML에서 포스트 URL regex 추출 → OG 태그."""
-    handle = account["handle"].lstrip("@")
-    profile_url = f"https://www.threads.net/@{handle}"
-
-    post_links = set()
-    last_error = None
-
-    for ua in _THREADS_USER_AGENTS:
-        try:
-            headers = {"User-Agent": ua}
-            async with httpx.AsyncClient(
-                follow_redirects=True, timeout=15.0
-            ) as client:
-                resp = await client.get(profile_url, headers=headers)
-                resp.raise_for_status()
-
-            found = _find_threads_post_urls(resp.text, handle)
-            post_links.update(found)
-
-            if post_links:
-                break
-        except Exception as e:
-            last_error = str(e)
-            logger.debug("[%s] Threads 프로필 접속 실패 (UA=%s): %s",
-                         handle, ua[:30], e)
-            continue
-
-    posts_found = len(post_links)
-    posts_added = 0
-
-    for post_url in post_links:
-        if repo.social_post_exists_url(post_url):
-            continue
-
-        try:
-            from src.services.social_extractor import _extract_threads
-            metadata = await _extract_threads(post_url, account["handle"])
-            repo.create_social_post(
-                platform="threads",
-                original_url=post_url,
-                author_handle=account["handle"],
-                author_name=(metadata.get("author_name")
-                             or account.get("display_name") or ""),
-                content=metadata.get("content") or None,
-                image_url=metadata.get("image_url") or None,
-                embed_html=None,
-                posted_date=None,
-                account_id=account["id"],
-            )
-            posts_added += 1
-            await asyncio.sleep(1)
-        except Exception as e:
-            logger.debug("[%s] Threads 포스트 추출 실패 %s: %s",
-                         handle, post_url, e)
-            continue
-
-    if posts_found == 0:
-        err = "Threads 프로필에서 포스트를 찾을 수 없음 (JS 렌더링 제한)"
-        if last_error:
-            err += f" — {last_error}"
-        err += ". 소셜 포스트 > 일괄 URL 크롤링으로 개별 포스트 URL을 등록해주세요."
-        return {"posts_found": 0, "posts_added": 0, "error": err}
-
-    return {"posts_found": posts_found, "posts_added": posts_added, "error": None}
+    """Threads 계정은 자동 크롤링 미지원 — JS 렌더링 제한."""
+    return {
+        "posts_found": 0,
+        "posts_added": 0,
+        "error": "Threads는 자동 크롤링을 지원하지 않습니다. "
+                 "소셜 포스트 > 일괄 URL 크롤링으로 개별 포스트 URL을 등록해주세요.",
+    }
 
 
 # --- Helpers ---
