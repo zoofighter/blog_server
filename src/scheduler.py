@@ -12,6 +12,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 
 from src.database.repository import Repository
 from src.services.crawler import crawl_all_blogs
+from src.services.social_crawler import crawl_all_social_accounts
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +36,26 @@ async def _run_crawl(repo: Repository, config: dict):
         logger.error("스케줄 크롤링 실패: %s", e)
 
 
+async def _run_social_crawl(repo: Repository, config: dict):
+    """스케줄러에서 호출되는 소셜 계정 크롤링 작업."""
+    logger.info("소셜 스케줄 크롤링 시작")
+    try:
+        result = await crawl_all_social_accounts(repo, config)
+        logger.info(
+            "소셜 스케줄 크롤링 완료: %d계정, +%d포스트, %d오류",
+            result["total_accounts"], result["total_added"], result["errors"],
+        )
+    except Exception as e:
+        logger.error("소셜 스케줄 크롤링 실패: %s", e)
+
+
 def start_scheduler(repo: Repository, config: dict) -> AsyncIOScheduler:
     """크롤링 스케줄러를 시작한다."""
     global _scheduler
 
     scheduler_config = config.get("scheduler", {})
     interval_hours = scheduler_config.get("interval_hours", 3)
+    social_interval = scheduler_config.get("social_interval_hours", 6)
     enabled = scheduler_config.get("enabled", True)
 
     if not enabled:
@@ -57,8 +72,18 @@ def start_scheduler(repo: Repository, config: dict) -> AsyncIOScheduler:
         max_instances=1,
         replace_existing=True,
     )
+    _scheduler.add_job(
+        _run_social_crawl,
+        trigger=IntervalTrigger(hours=social_interval),
+        args=[repo, config],
+        id="social_crawl",
+        name="소셜 계정 크롤링",
+        max_instances=1,
+        replace_existing=True,
+    )
     _scheduler.start()
-    logger.info("크롤링 스케줄러 시작 (간격: %d시간)", interval_hours)
+    logger.info("크롤링 스케줄러 시작 (RSS: %d시간, 소셜: %d시간)",
+                interval_hours, social_interval)
     return _scheduler
 
 

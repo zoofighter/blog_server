@@ -77,12 +77,71 @@ def init_db(db_path: str) -> None:
 
         CREATE INDEX IF NOT EXISTS idx_crawl_logs_blog ON crawl_logs(blog_id);
         CREATE INDEX IF NOT EXISTS idx_crawl_logs_at ON crawl_logs(crawled_at DESC);
+
+        CREATE TABLE IF NOT EXISTS social_posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            platform TEXT NOT NULL CHECK(platform IN ('twitter', 'threads')),
+            original_url TEXT UNIQUE NOT NULL,
+            author_handle TEXT,
+            author_name TEXT,
+            content TEXT,
+            image_url TEXT,
+            embed_html TEXT,
+            posted_date DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_social_posts_platform ON social_posts(platform);
+        CREATE INDEX IF NOT EXISTS idx_social_posts_posted ON social_posts(posted_date DESC);
+
+        CREATE TABLE IF NOT EXISTS social_accounts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            platform TEXT NOT NULL CHECK(platform IN ('twitter', 'threads')),
+            handle TEXT NOT NULL,
+            display_name TEXT,
+            profile_url TEXT NOT NULL,
+            feed_url TEXT,
+            description TEXT,
+            active INTEGER DEFAULT 1,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_social_accounts_handle
+            ON social_accounts(handle, platform);
+
+        CREATE TABLE IF NOT EXISTS social_crawl_logs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            account_id INTEGER,
+            status TEXT NOT NULL,
+            posts_found INTEGER DEFAULT 0,
+            posts_added INTEGER DEFAULT 0,
+            error_message TEXT,
+            crawled_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (account_id) REFERENCES social_accounts(id) ON DELETE CASCADE
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_social_crawl_logs_account ON social_crawl_logs(account_id);
+        CREATE INDEX IF NOT EXISTS idx_social_crawl_logs_at ON social_crawl_logs(crawled_at DESC);
     """)
 
     # blogs 테이블에 크롤링 관련 컬럼 추가 (이미 존재하면 무시)
     for col in ["last_crawled_at", "crawl_error"]:
         try:
             conn.execute(f"ALTER TABLE blogs ADD COLUMN {col} TEXT")
+        except Exception:
+            pass
+
+    # social_posts 테이블에 account_id 컬럼 추가
+    for col in ["account_id"]:
+        try:
+            conn.execute(f"ALTER TABLE social_posts ADD COLUMN {col} INTEGER REFERENCES social_accounts(id)")
+        except Exception:
+            pass
+
+    # social_accounts 테이블에 크롤링 상태 컬럼 추가
+    for col in ["last_crawled_at", "crawl_error"]:
+        try:
+            conn.execute(f"ALTER TABLE social_accounts ADD COLUMN {col} TEXT")
         except Exception:
             pass
 

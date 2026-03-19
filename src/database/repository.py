@@ -339,6 +339,304 @@ class Repository:
             "posts_added_24h": posts_added_24h,
         }
 
+    # --- social posts ---
+
+    def create_social_post(self, platform: str, original_url: str,
+                           author_handle: str = None, author_name: str = None,
+                           content: str = None, image_url: str = None,
+                           embed_html: str = None, posted_date: str = None,
+                           account_id: int = None) -> int:
+        conn = self._conn()
+        cursor = conn.execute(
+            """INSERT INTO social_posts
+               (platform, original_url, author_handle, author_name,
+                content, image_url, embed_html, posted_date, account_id)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (platform, original_url, author_handle, author_name,
+             content, image_url, embed_html, posted_date, account_id),
+        )
+        post_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return post_id
+
+    def get_social_posts(self, platform: str = None, account_id: int = None,
+                         page: int = 1, per_page: int = 30) -> tuple[list[dict], int]:
+        conn = self._conn()
+        conditions = []
+        params = []
+
+        if platform:
+            conditions.append("platform = ?")
+            params.append(platform)
+        if account_id:
+            conditions.append("account_id = ?")
+            params.append(account_id)
+
+        where = "WHERE " + " AND ".join(conditions) if conditions else ""
+
+        total = conn.execute(
+            f"SELECT COUNT(*) FROM social_posts {where}", params
+        ).fetchone()[0]
+
+        offset = (page - 1) * per_page
+        rows = conn.execute(
+            f"""SELECT * FROM social_posts {where}
+                ORDER BY posted_date DESC NULLS LAST, created_at DESC
+                LIMIT ? OFFSET ?""",
+            params + [per_page, offset],
+        ).fetchall()
+
+        conn.close()
+        return [dict(r) for r in rows], total
+
+    def get_social_post(self, post_id: int) -> Optional[dict]:
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT * FROM social_posts WHERE id = ?", (post_id,)
+        ).fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def delete_social_post(self, post_id: int) -> None:
+        conn = self._conn()
+        conn.execute("DELETE FROM social_posts WHERE id = ?", (post_id,))
+        conn.commit()
+        conn.close()
+
+    def social_post_exists_url(self, url: str) -> bool:
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT 1 FROM social_posts WHERE original_url = ?", (url,)
+        ).fetchone()
+        conn.close()
+        return row is not None
+
+    def get_all_social_posts(self) -> list[dict]:
+        conn = self._conn()
+        rows = conn.execute(
+            "SELECT * FROM social_posts ORDER BY posted_date DESC NULLS LAST, created_at DESC"
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def bulk_create_social_posts(self, posts: list[dict]) -> int:
+        """여러 소셜 포스트를 한 번에 등록한다. URL 중복은 건너뛴다. 등록 건수를 반환."""
+        conn = self._conn()
+        count = 0
+        for p in posts:
+            existing = conn.execute(
+                "SELECT 1 FROM social_posts WHERE original_url = ?",
+                (p.get("original_url", ""),)
+            ).fetchone()
+            if existing:
+                continue
+            conn.execute(
+                """INSERT INTO social_posts
+                   (platform, original_url, author_handle, author_name,
+                    content, image_url, embed_html, posted_date)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (p.get("platform", "twitter"), p.get("original_url", ""),
+                 p.get("author_handle") or None, p.get("author_name") or None,
+                 p.get("content") or None, p.get("image_url") or None,
+                 p.get("embed_html") or None, p.get("posted_date") or None),
+            )
+            count += 1
+        conn.commit()
+        conn.close()
+        return count
+
+    def get_social_post_counts(self) -> dict:
+        conn = self._conn()
+        total = conn.execute("SELECT COUNT(*) FROM social_posts").fetchone()[0]
+        twitter = conn.execute(
+            "SELECT COUNT(*) FROM social_posts WHERE platform = 'twitter'"
+        ).fetchone()[0]
+        threads = conn.execute(
+            "SELECT COUNT(*) FROM social_posts WHERE platform = 'threads'"
+        ).fetchone()[0]
+        conn.close()
+        return {"total": total, "twitter": twitter, "threads": threads}
+
+    # --- social accounts ---
+
+    def create_social_account(self, platform: str, handle: str,
+                              display_name: str = None, profile_url: str = "",
+                              feed_url: str = None, description: str = None) -> int:
+        conn = self._conn()
+        cursor = conn.execute(
+            """INSERT INTO social_accounts
+               (platform, handle, display_name, profile_url, feed_url, description)
+               VALUES (?, ?, ?, ?, ?, ?)""",
+            (platform, handle, display_name, profile_url, feed_url, description),
+        )
+        account_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return account_id
+
+    def get_all_social_accounts(self, active_only: bool = False) -> list:
+        conn = self._conn()
+        if active_only:
+            rows = conn.execute(
+                "SELECT * FROM social_accounts WHERE active = 1 ORDER BY platform, handle"
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM social_accounts ORDER BY platform, handle"
+            ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def get_social_account(self, account_id: int) -> Optional[dict]:
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT * FROM social_accounts WHERE id = ?", (account_id,)
+        ).fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def update_social_account(self, account_id: int, **kwargs) -> None:
+        if not kwargs:
+            return
+        fields = ", ".join(f"{k} = ?" for k in kwargs)
+        values = list(kwargs.values()) + [account_id]
+        conn = self._conn()
+        conn.execute(f"UPDATE social_accounts SET {fields} WHERE id = ?", values)
+        conn.commit()
+        conn.close()
+
+    def delete_social_account(self, account_id: int) -> None:
+        conn = self._conn()
+        conn.execute("DELETE FROM social_accounts WHERE id = ?", (account_id,))
+        conn.commit()
+        conn.close()
+
+    def social_account_exists(self, handle: str, platform: str) -> bool:
+        conn = self._conn()
+        row = conn.execute(
+            "SELECT 1 FROM social_accounts WHERE handle = ? AND platform = ?",
+            (handle, platform),
+        ).fetchone()
+        conn.close()
+        return row is not None
+
+    def get_active_social_accounts(self, platform: str = None) -> list:
+        conn = self._conn()
+        conditions = ["active = 1"]
+        params = []
+        if platform:
+            conditions.append("platform = ?")
+            params.append(platform)
+        where = " AND ".join(conditions)
+        rows = conn.execute(
+            f"SELECT * FROM social_accounts WHERE {where} ORDER BY handle", params
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def update_social_account_crawl_status(self, account_id: int,
+                                           error: str = None) -> None:
+        conn = self._conn()
+        conn.execute(
+            """UPDATE social_accounts
+               SET last_crawled_at = CURRENT_TIMESTAMP, crawl_error = ?
+               WHERE id = ?""",
+            (error, account_id),
+        )
+        conn.commit()
+        conn.close()
+
+    def get_social_account_post_counts(self) -> dict:
+        conn = self._conn()
+        rows = conn.execute(
+            """SELECT account_id, COUNT(*) as cnt
+               FROM social_posts WHERE account_id IS NOT NULL
+               GROUP BY account_id"""
+        ).fetchall()
+        conn.close()
+        return {r["account_id"]: r["cnt"] for r in rows}
+
+    def bulk_create_social_accounts(self, accounts: list) -> int:
+        conn = self._conn()
+        count = 0
+        for a in accounts:
+            existing = conn.execute(
+                "SELECT 1 FROM social_accounts WHERE handle = ? AND platform = ?",
+                (a.get("handle", ""), a.get("platform", "")),
+            ).fetchone()
+            if existing:
+                continue
+            conn.execute(
+                """INSERT INTO social_accounts
+                   (platform, handle, display_name, profile_url, feed_url, description)
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (a.get("platform", "twitter"), a.get("handle", ""),
+                 a.get("display_name") or None, a.get("profile_url", ""),
+                 a.get("feed_url") or None, a.get("description") or None),
+            )
+            count += 1
+        conn.commit()
+        conn.close()
+        return count
+
+    # --- social crawl logs ---
+
+    def create_social_crawl_log(self, account_id: int, status: str,
+                                posts_found: int = 0, posts_added: int = 0,
+                                error_message: str = None) -> int:
+        conn = self._conn()
+        cursor = conn.execute(
+            """INSERT INTO social_crawl_logs
+               (account_id, status, posts_found, posts_added, error_message)
+               VALUES (?, ?, ?, ?, ?)""",
+            (account_id, status, posts_found, posts_added, error_message),
+        )
+        log_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return log_id
+
+    def get_social_crawl_logs(self, account_id: int = None, limit: int = 50) -> list:
+        conn = self._conn()
+        if account_id:
+            rows = conn.execute(
+                """SELECT scl.*, sa.handle as account_handle, sa.platform
+                   FROM social_crawl_logs scl
+                   LEFT JOIN social_accounts sa ON scl.account_id = sa.id
+                   WHERE scl.account_id = ?
+                   ORDER BY scl.crawled_at DESC LIMIT ?""",
+                (account_id, limit),
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                """SELECT scl.*, sa.handle as account_handle, sa.platform
+                   FROM social_crawl_logs scl
+                   LEFT JOIN social_accounts sa ON scl.account_id = sa.id
+                   ORDER BY scl.crawled_at DESC LIMIT ?""",
+                (limit,),
+            ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def get_social_crawl_stats(self) -> dict:
+        conn = self._conn()
+        total_active = conn.execute(
+            "SELECT COUNT(*) FROM social_accounts WHERE active = 1"
+        ).fetchone()[0]
+        crawls_24h = conn.execute(
+            "SELECT COUNT(*) FROM social_crawl_logs WHERE crawled_at > datetime('now', '-1 day')"
+        ).fetchone()[0]
+        posts_added_24h = conn.execute(
+            "SELECT COALESCE(SUM(posts_added), 0) FROM social_crawl_logs WHERE crawled_at > datetime('now', '-1 day')"
+        ).fetchone()[0]
+        conn.close()
+        return {
+            "total_active": total_active,
+            "crawls_24h": crawls_24h,
+            "posts_added_24h": posts_added_24h,
+        }
+
     # --- stats ---
 
     def get_stats(self) -> dict:

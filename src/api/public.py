@@ -43,6 +43,35 @@ async def index(
     })
 
 
+@router.get("/social")
+async def social_page(
+    request: Request,
+    platform: str = None,
+    account_id: int = None,
+    page: int = Query(1, ge=1),
+):
+    repo = request.app.state.repo
+    templates = request.app.state.templates
+    per_page = 30
+
+    posts, total = repo.get_social_posts(
+        platform=platform, account_id=account_id, page=page, per_page=per_page
+    )
+    total_pages = math.ceil(total / per_page) if total > 0 else 1
+    accounts = repo.get_all_social_accounts(active_only=True)
+
+    return templates.TemplateResponse("social.html", {
+        "request": request,
+        "posts": posts,
+        "total": total,
+        "page": page,
+        "total_pages": total_pages,
+        "platform": platform,
+        "account_id": account_id,
+        "accounts": accounts,
+    })
+
+
 @router.get("/post/{post_id}")
 async def post_detail(request: Request, post_id: int):
     repo = request.app.state.repo

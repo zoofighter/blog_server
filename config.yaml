@@ -35,7 +35,8 @@ server:
 # RSS 크롤링 스케줄러
 scheduler:
   enabled: true           # false로 설정 시 자동 크롤링 비활성화
-  interval_hours: 3       # 크롤링 간격 (시간)
+  interval_hours: 3       # 블로그 RSS 크롤링 간격 (시간)
+  social_interval_hours: 6  # 소셜 계정 크롤링 간격 (시간)
 
 # 카테고리 정의
 categories:

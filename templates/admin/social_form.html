@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+{% block title %}소셜 포스트 등록{% endblock %}
+
+{% block nav_extra %}
+<div class="flex items-center gap-3 text-sm">
+    <a href="/admin/" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">대시보드</a>
+    <a href="/admin/posts" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">포스트</a>
+    <a href="/admin/blogs" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">블로그 소스</a>
+    <a href="/admin/crawl" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">크롤링</a>
+    <a href="/admin/social" class="text-indigo-600 dark:text-indigo-400 font-medium">소셜</a>
+    <a href="/admin/logout" class="text-gray-400 hover:text-red-500">로그아웃</a>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-3xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">소셜 포스트 등록</h1>
+
+    {% if error %}
+    <div class="bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg mb-4 text-sm">{{ error }}</div>
+    {% endif %}
+
+    <!-- URL 메타데이터 추출 -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-6">
+        <h2 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3">1. URL에서 메타데이터 추출</h2>
+        <div class="flex gap-2">
+            <input type="url" id="extract-url" placeholder="https://x.com/username/status/... 또는 https://threads.net/..."
+                   class="flex-1 px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            <button type="button" id="btn-extract"
+                    class="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 whitespace-nowrap">
+                추출
+            </button>
+        </div>
+        <p id="extract-status" class="text-xs text-gray-400 mt-2 hidden"></p>
+    </div>
+
+    <!-- 등록 폼 -->
+    <form method="post" action="/admin/social"
+          class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 space-y-4">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">플랫폼 *</label>
+                <select name="platform" id="field-platform" required
+                        class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="twitter">Twitter</option>
+                    <option value="threads">Threads</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">포스트 URL *</label>
+                <input type="url" name="original_url" id="field-url" required
+                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">작성자 핸들</label>
+                <input type="text" name="author_handle" id="field-handle" placeholder="@username"
+                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">작성자 이름</label>
+                <input type="text" name="author_name" id="field-name"
+                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">내용</label>
+            <textarea name="content" id="field-content" rows="4"
+                      class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">이미지 URL</label>
+                <input type="url" name="image_url" id="field-image"
+                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">게시 날짜</label>
+                <input type="date" name="posted_date" id="field-date"
+                       class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+        </div>
+
+        <input type="hidden" name="embed_html" id="field-embed">
+
+        <div class="flex items-center gap-3 pt-4">
+            <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">등록</button>
+            <a href="/admin/social" class="px-6 py-2 text-gray-500 hover:text-gray-700 dark:text-gray-400">취소</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.getElementById('btn-extract').addEventListener('click', async () => {
+    const url = document.getElementById('extract-url').value.trim();
+    if (!url) return;
+
+    const status = document.getElementById('extract-status');
+    const btn = document.getElementById('btn-extract');
+    status.textContent = '추출 중...';
+    status.className = 'text-xs text-gray-400 mt-2';
+    btn.disabled = true;
+
+    try {
+        const resp = await fetch('/admin/social/extract', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url})
+        });
+        const data = await resp.json();
+        if (data.error) {
+            status.textContent = data.error;
+            status.classList.add('text-red-500');
+            return;
+        }
+
+        document.getElementById('field-platform').value = data.platform || 'twitter';
+        document.getElementById('field-url').value = data.original_url || url;
+        document.getElementById('field-handle').value = data.author_handle || '';
+        document.getElementById('field-name').value = data.author_name || '';
+        document.getElementById('field-content').value = data.content || '';
+        document.getElementById('field-image').value = data.image_url || '';
+        document.getElementById('field-date').value = data.posted_date || '';
+        document.getElementById('field-embed').value = data.embed_html || '';
+
+        status.textContent = '추출 완료';
+        status.classList.remove('text-red-500');
+        status.classList.add('text-green-500');
+    } catch (e) {
+        status.textContent = '추출 실패: ' + e.message;
+        status.classList.add('text-red-500');
+    } finally {
+        btn.disabled = false;
+    }
+});
+</script>
+{% endblock %}
