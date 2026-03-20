@@ -143,7 +143,8 @@ class Repository:
                 FROM posts p
                 LEFT JOIN blogs b ON p.blog_id = b.id
                 {where}
-                ORDER BY p.published_date DESC NULLS LAST, p.created_at DESC
+                ORDER BY date(p.published_date) DESC NULLS LAST,
+                         (p.id * 2654435761) % 2147483647
                 LIMIT ? OFFSET ?""",
             params + [per_page, offset],
         ).fetchall()
@@ -382,7 +383,8 @@ class Repository:
         offset = (page - 1) * per_page
         rows = conn.execute(
             f"""SELECT * FROM social_posts {where}
-                ORDER BY posted_date DESC NULLS LAST, created_at DESC
+                ORDER BY date(posted_date) DESC NULLS LAST,
+                         (id * 2654435761) % 2147483647
                 LIMIT ? OFFSET ?""",
             params + [per_page, offset],
         ).fetchall()

@@ -19,6 +19,18 @@
     -webkit-box-orient: vertical;
     -webkit-line-clamp: 3;
 }
+.line-clamp-4 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 4;
+}
+.line-clamp-10 {
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 10;
+}
 
 /* 스크롤바 스타일 (다크모드) */
 .dark ::-webkit-scrollbar {
@@ -30,4 +42,34 @@
 .dark ::-webkit-scrollbar-thumb {
     background: #4b5563;
     border-radius: 4px;
+}
+
+/* 뷰 전환 애니메이션 */
+#view-card, #view-timeline, #view-embed {
+    animation: viewFadeIn 0.15s ease-in;
+}
+@keyframes viewFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+/* Twitter 임베드 위젯 반응형 */
+#view-embed .twitter-tweet,
+#view-embed .twitter-tweet-rendered,
+#view-embed twitterwidget {
+    margin: 0 auto !important;
+    max-width: 100% !important;
+}
+
+/* 위젯 로딩 전 blockquote 스타일 */
+#view-embed .embed-content blockquote.twitter-tweet {
+    border-left: 4px solid #e5e7eb;
+    padding: 16px;
+    margin: 0;
+    font-style: italic;
+    color: #6b7280;
+}
+.dark #view-embed .embed-content blockquote.twitter-tweet {
+    border-left-color: #374151;
+    color: #9ca3af;
 }

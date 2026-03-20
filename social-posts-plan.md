@@ -253,3 +253,45 @@ CREATE TABLE IF NOT EXISTS social_crawl_logs (
 - Nitter 인스턴스 가용성이 불안정할 수 있음 → 다수 인스턴스 폴백
 - Threads 프로필은 JS 렌더링으로 포스트 추출이 제한적 → best-effort
 - 기존 `social_posts`의 `account_id = NULL` 데이터는 개별 등록 포스트로 유지
+
+---
+
+## 구현 완료 내역
+
+### Phase 1 — 소셜 포스트 기본 기능 ✅
+- `social_posts` 테이블, Repository CRUD, social_extractor.py (oEmbed)
+- 공개 `/social` 페이지 (카드 그리드, 플랫폼 탭, 페이지네이션)
+- 관리자: 포스트 목록, 등록 폼, URL 메타데이터 추출, 삭제
+
+### Phase 2 — CSV 일괄 관리 + URL 일괄 크롤링 ✅
+- CSV 내보내기/가져오기/템플릿 다운로드
+- URL textarea 일괄 추출 등록
+
+### Phase 3 — 계정 기반 자동 크롤링 ✅
+- `social_accounts`, `social_crawl_logs` 테이블
+- Twitter: Nitter RSS → 자동 크롤링
+- Threads: Meta 차단으로 자동 크롤링 불가 → "일괄 URL" 버튼으로 수동 등록 유도
+- 스케줄러 연동 (`social_interval_hours`)
+- 계정 관리 UI (등록/토글/삭제/크롤링/CSV)
+- 공개 페이지: 계정 필터 칩 추가
+
+### Phase 4 — Threads 메타데이터 추출 간소화 ✅ (커밋: `e41f191`)
+- Playwright 헤드리스 브라우저 시도 → Meta 서버사이드 봇 차단으로 실패
+- curl_cffi TLS 핑거프린팅, playwright-stealth 등 모두 실패
+- 최종: URL 기반 핸들 추출만 사용 (`_base_metadata()`)
+- `threads.com` 도메인 인식 추가, 핸들 정규식 `.` 지원
+
+### Phase 5 — RSS 피드 출력 ✅ (커밋: `017c293`)
+- `feedgen` 패키지 사용
+- `GET /feed` — 블로그 포스트 RSS (최신 30건, `?category=` 필터)
+- `GET /feed/social` — 소셜 포스트 RSS (최신 30건, `?platform=` 필터)
+- `config.yaml`에 `site` 섹션 (title, url, description)
+- `base.html`에 RSS `<link>` 태그 + nav RSS 아이콘
+
+### Phase 6 — 소셜 페이지 뷰 모드 토글 ✅
+- 카드/타임라인/임베드 3가지 뷰 모드 전환
+- 클라이언트 사이드 JS 토글 (백엔드 변경 없음)
+- `localStorage`로 선택 유지
+- 임베드 뷰: Twitter `widgets.js` lazy load, 다크모드 감지
+- `embed_html` 없는 포스트: "원문 보기" 폴백 카드
+- 수정 파일: `templates/social.html`, `static/style.css`
