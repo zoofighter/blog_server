@@ -1,5 +1,11 @@
 # 블로그 애그리게이션 플랫폼 설정
 
+# 사이트 정보
+site:
+  title: "BlogAgg"
+  url: "https://example.com"   # 배포 시 실제 URL로 변경
+  description: "Blog Aggregator · Personal Curation"
+
 # 데이터베이스
 database:
   path: "data/blog.db"
