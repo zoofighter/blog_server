@@ -20,7 +20,7 @@ async def index(
 ):
     repo = request.app.state.repo
     templates = request.app.state.templates
-    per_page = 12
+    per_page = 30
 
     posts, total = repo.get_posts(
         category=category, tag=tag, search=search, page=page, per_page=per_page
@@ -51,6 +51,7 @@ async def social_page(
     request: Request,
     platform: str = None,
     account_id: int = None,
+    search: str = None,
     page: int = Query(1, ge=1),
 ):
     repo = request.app.state.repo
@@ -58,7 +59,8 @@ async def social_page(
     per_page = 30
 
     posts, total = repo.get_social_posts(
-        platform=platform, account_id=account_id, page=page, per_page=per_page
+        platform=platform, account_id=account_id, search=search,
+        page=page, per_page=per_page,
     )
     total_pages = math.ceil(total / per_page) if total > 0 else 1
     accounts = repo.get_all_social_accounts(active_only=True)
@@ -71,7 +73,43 @@ async def social_page(
         "total_pages": total_pages,
         "platform": platform,
         "account_id": account_id,
+        "search": search or "",
         "accounts": accounts,
+    })
+
+
+@router.get("/bookmarks")
+async def bookmarks_page(
+    request: Request,
+    blog_ids: str = "",
+    social_ids: str = "",
+):
+    repo = request.app.state.repo
+    templates = request.app.state.templates
+
+    blog_posts = []
+    social_posts = []
+
+    if blog_ids:
+        try:
+            ids = [int(x) for x in blog_ids.split(",") if x.strip()][:100]
+            blog_posts = repo.get_posts_by_ids(ids)
+            for post in blog_posts:
+                post["tags"] = repo.get_post_tags(post["id"])
+        except ValueError:
+            pass
+
+    if social_ids:
+        try:
+            ids = [int(x) for x in social_ids.split(",") if x.strip()][:100]
+            social_posts = repo.get_social_posts_by_ids(ids)
+        except ValueError:
+            pass
+
+    return templates.TemplateResponse("bookmarks.html", {
+        "request": request,
+        "blog_posts": blog_posts,
+        "social_posts": social_posts,
     })
 
 

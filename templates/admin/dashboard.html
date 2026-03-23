@@ -36,6 +36,31 @@
     </div>
 </div>
 
+<!-- 소셜 통계 -->
+<h2 class="text-lg font-semibold mb-3">소셜</h2>
+<div class="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">소셜 포스트</p>
+        <p class="text-3xl font-bold text-purple-600 dark:text-purple-400">{{ social_counts.total }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">활성 계정</p>
+        <p class="text-3xl font-bold text-green-600 dark:text-green-400">{{ social_crawl_stats.total_active }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Twitter</p>
+        <p class="text-3xl font-bold text-gray-700 dark:text-gray-300">{{ social_counts.twitter }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Threads</p>
+        <p class="text-3xl font-bold text-gray-700 dark:text-gray-300">{{ social_counts.threads }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700">
+        <p class="text-sm text-gray-500 dark:text-gray-400 mb-1">Bluesky</p>
+        <p class="text-3xl font-bold text-sky-600 dark:text-sky-400">{{ social_counts.bluesky }}</p>
+    </div>
+</div>
+
 <!-- 카테고리별 분포 -->
 {% if stats.by_category %}
 <div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mb-8">
@@ -74,9 +99,31 @@
 </div>
 {% endif %}
 
-<div class="mt-8">
+<!-- 최근 소셜 포스트 -->
+{% if recent_social %}
+<div class="bg-white dark:bg-gray-800 rounded-xl p-6 border border-gray-200 dark:border-gray-700 mt-6">
+    <h2 class="text-lg font-semibold mb-4">최근 소셜 포스트</h2>
+    <div class="space-y-3">
+        {% for post in recent_social %}
+        <div class="flex items-center justify-between text-sm">
+            <div class="truncate flex-1 mr-4">
+                <span class="text-xs uppercase text-gray-400 mr-1">{{ post.platform }}</span>
+                <span class="font-medium">{{ post.author_handle or "" }}</span>
+                <span class="text-gray-500 dark:text-gray-400 ml-1">{{ (post.content or "")[:60] }}{% if post.content and post.content|length > 60 %}...{% endif %}</span>
+            </div>
+            <span class="text-xs text-gray-500 dark:text-gray-400 shrink-0">{{ post.created_at[:10] if post.created_at else "" }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="mt-8 flex gap-3">
     <a href="/admin/posts/new" class="inline-flex items-center gap-2 px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700">
         + 포스트 등록
+    </a>
+    <a href="/admin/social/new" class="inline-flex items-center gap-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+        + 소셜 등록
     </a>
 </div>
 {% endblock %}

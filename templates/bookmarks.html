@@ -1,0 +1,172 @@
+{% extends "base.html" %}
+{% block title %}Bookmarks{% endblock %}
+
+{% block content %}
+<h1 class="text-2xl font-bold mb-6">북마크</h1>
+
+<div id="bookmarks-loading" class="text-center py-20 text-gray-400 dark:text-gray-600">
+    <p>북마크를 불러오는 중...</p>
+</div>
+
+<div id="bookmarks-content" class="hidden">
+    <!-- 탭 -->
+    <div class="flex gap-2 mb-6">
+        <button onclick="showTab('blog')" id="tab-blog"
+                class="px-3 py-1.5 text-sm rounded-full bg-indigo-600 text-white">블로그 포스트</button>
+        <button onclick="showTab('social')" id="tab-social"
+                class="px-3 py-1.5 text-sm rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300">소셜 포스트</button>
+    </div>
+
+    <!-- 블로그 북마크 -->
+    <div id="section-blog">
+        {% if blog_posts %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for post in blog_posts %}
+            <article class="relative bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow" data-bookmark-type="blog" data-bookmark-id="{{ post.id }}">
+                <button onclick="event.preventDefault(); removeBookmark('blog', {{ post.id }}, this)"
+                        class="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-800 shadow-sm text-indigo-500"
+                        title="북마크 해제">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                    </svg>
+                </button>
+                {% if post.image_url %}
+                <a href="/post/{{ post.id }}">
+                    <img src="{{ post.image_url }}" alt="" class="w-full h-56 object-cover" loading="lazy"
+                         onerror="this.style.display='none'">
+                </a>
+                {% endif %}
+                <div class="p-4">
+                    <a href="/post/{{ post.id }}" class="block">
+                        <h2 class="font-semibold text-lg mb-2 line-clamp-2 hover:text-indigo-600 dark:hover:text-indigo-400">
+                            {{ post.title }}
+                        </h2>
+                    </a>
+                    {% if post.summary %}
+                    <p class="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-3">{{ post.summary }}</p>
+                    {% endif %}
+                    <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-500">
+                        <span>{{ post.blog_name or "Unknown" }}</span>
+                        <span>{{ post.published_date or post.created_at[:10] if post.created_at else "" }}</span>
+                    </div>
+                </div>
+            </article>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-center py-12 text-gray-400 dark:text-gray-600">북마크된 블로그 포스트가 없습니다.</p>
+        {% endif %}
+    </div>
+
+    <!-- 소셜 북마크 -->
+    <div id="section-social" class="hidden">
+        {% if social_posts %}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for post in social_posts %}
+            <div class="relative" data-bookmark-type="social" data-bookmark-id="{{ post.id }}">
+                <button onclick="event.preventDefault(); removeBookmark('social', {{ post.id }}, this)"
+                        class="absolute top-2 right-2 z-10 p-1.5 rounded-full bg-white/80 dark:bg-gray-800/80 hover:bg-white dark:hover:bg-gray-800 shadow-sm text-indigo-500"
+                        title="북마크 해제">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+                    </svg>
+                </button>
+                <a href="{{ post.original_url }}" target="_blank" rel="noopener noreferrer"
+                   class="block bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden hover:shadow-md transition-shadow">
+                    {% if post.image_url %}
+                    <img src="{{ post.image_url }}" alt="" class="w-full h-48 object-cover" loading="lazy"
+                         onerror="this.style.display='none'">
+                    {% endif %}
+                    <div class="p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="text-xs uppercase text-gray-400">{{ post.platform }}</span>
+                            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ post.author_handle or post.author_name or "" }}</span>
+                        </div>
+                        {% if post.content %}
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-3 line-clamp-3">{{ post.content }}</p>
+                        {% endif %}
+                        <div class="text-xs text-gray-500">
+                            {{ post.posted_date[:10] if post.posted_date else post.created_at[:10] if post.created_at else "" }}
+                        </div>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-center py-12 text-gray-400 dark:text-gray-600">북마크된 소셜 포스트가 없습니다.</p>
+        {% endif %}
+    </div>
+</div>
+
+<div id="bookmarks-empty" class="hidden text-center py-20 text-gray-400 dark:text-gray-600">
+    <p class="text-lg mb-2">북마크가 비어 있습니다</p>
+    <p class="text-sm">포스트 카드의 북마크 아이콘을 눌러 추가하세요</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+    var BLOG_KEY = 'bookmarks_blog';
+    var SOCIAL_KEY = 'bookmarks_social';
+
+    function getIds(key) {
+        try { return JSON.parse(localStorage.getItem(key) || '[]'); }
+        catch(e) { return []; }
+    }
+
+    var blogIds = getIds(BLOG_KEY);
+    var socialIds = getIds(SOCIAL_KEY);
+    var params = new URLSearchParams(window.location.search);
+
+    if (blogIds.length === 0 && socialIds.length === 0) {
+        document.getElementById('bookmarks-loading').classList.add('hidden');
+        document.getElementById('bookmarks-empty').classList.remove('hidden');
+    } else if (!params.has('blog_ids') && !params.has('social_ids')) {
+        var url = '/bookmarks?';
+        if (blogIds.length) url += 'blog_ids=' + blogIds.join(',') + '&';
+        if (socialIds.length) url += 'social_ids=' + socialIds.join(',');
+        window.location.replace(url);
+    } else {
+        document.getElementById('bookmarks-loading').classList.add('hidden');
+        document.getElementById('bookmarks-content').classList.remove('hidden');
+    }
+
+    window.removeBookmark = function(type, id, btn) {
+        var key = type === 'blog' ? BLOG_KEY : SOCIAL_KEY;
+        var ids = getIds(key);
+        var idx = ids.indexOf(id);
+        if (idx >= 0) {
+            ids.splice(idx, 1);
+            localStorage.setItem(key, JSON.stringify(ids));
+        }
+        var card = btn.closest('[data-bookmark-type]');
+        if (card) {
+            card.style.transition = 'opacity 0.2s';
+            card.style.opacity = '0';
+            setTimeout(function() { card.remove(); }, 200);
+        }
+    };
+
+    window.showTab = function(tab) {
+        var blogSection = document.getElementById('section-blog');
+        var socialSection = document.getElementById('section-social');
+        var tabBlog = document.getElementById('tab-blog');
+        var tabSocial = document.getElementById('tab-social');
+
+        if (tab === 'social') {
+            blogSection.classList.add('hidden');
+            socialSection.classList.remove('hidden');
+            tabBlog.className = 'px-3 py-1.5 text-sm rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+            tabSocial.className = 'px-3 py-1.5 text-sm rounded-full bg-indigo-600 text-white';
+        } else {
+            socialSection.classList.add('hidden');
+            blogSection.classList.remove('hidden');
+            tabSocial.className = 'px-3 py-1.5 text-sm rounded-full bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300';
+            tabBlog.className = 'px-3 py-1.5 text-sm rounded-full bg-indigo-600 text-white';
+        }
+    };
+})();
+</script>
+{% endblock %}

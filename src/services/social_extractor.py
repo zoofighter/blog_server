@@ -1,4 +1,4 @@
-"""소셜 포스트(Twitter/Threads) URL에서 메타데이터를 추출하는 서비스."""
+"""소셜 포스트(Twitter/Threads/Bluesky) URL에서 메타데이터를 추출하는 서비스."""
 
 import logging
 import re
@@ -10,6 +10,7 @@ from bs4 import BeautifulSoup
 logger = logging.getLogger(__name__)
 
 TWITTER_OEMBED_URL = "https://publish.twitter.com/oembed"
+BSKY_PUBLIC_API = "https://public.api.bsky.app/xrpc"
 
 
 def detect_platform(url: str) -> Optional[str]:
@@ -19,6 +20,8 @@ def detect_platform(url: str) -> Optional[str]:
         return "twitter"
     if "threads.net" in lower or "threads.com" in lower:
         return "threads"
+    if "bsky.app" in lower:
+        return "bluesky"
     return None
 
 
@@ -34,6 +37,11 @@ def _extract_handle_from_url(url: str, platform: str) -> str:
         if m:
             handle = m.group(1)
             return handle if handle.startswith("@") else f"@{handle}"
+    elif platform == "bluesky":
+        m = re.search(r"bsky\.app/profile/([^/]+)", url)
+        if m:
+            handle = m.group(1)
+            return f"@{handle}" if not handle.startswith("@") else handle
     return ""
 
 
@@ -62,13 +70,15 @@ async def extract_social_metadata(url: str) -> dict:
     """
     platform = detect_platform(url)
     if not platform:
-        raise ValueError("지원하지 않는 플랫폼입니다. (Twitter/Threads만 지원)")
+        raise ValueError("지원하지 않는 플랫폼입니다. (Twitter/Threads/Bluesky 지원)")
 
     handle = _extract_handle_from_url(url, platform)
 
     try:
         if platform == "twitter":
             return await _extract_twitter(url, handle)
+        elif platform == "bluesky":
+            return await _extract_bluesky(url, handle)
         else:
             # Threads는 비인증 메타데이터 추출 불가 — URL 기반 정보만 반환
             return _base_metadata(url)
@@ -99,6 +109,63 @@ async def _extract_twitter(url: str, handle: str) -> dict:
         "image_url": "",
         "embed_html": data.get("html", ""),
         "posted_date": "",
+    }
+
+
+async def _extract_bluesky(url: str, handle: str) -> dict:
+    """Bluesky AT Protocol 공개 API로 포스트 메타데이터를 추출한다."""
+    m = re.search(r"bsky\.app/profile/([^/]+)/post/([^/?]+)", url)
+    if not m:
+        return _base_metadata(url)
+
+    actor = m.group(1)
+    rkey = m.group(2)
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; BlogAggregator/1.0)"}
+
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        # handle -> DID 변환
+        if not actor.startswith("did:"):
+            resp = await client.get(
+                f"{BSKY_PUBLIC_API}/com.atproto.identity.resolveHandle",
+                params={"handle": actor},
+                headers=headers,
+            )
+            resp.raise_for_status()
+            did = resp.json()["did"]
+        else:
+            did = actor
+
+        uri = f"at://{did}/app.bsky.feed.post/{rkey}"
+        resp = await client.get(
+            f"{BSKY_PUBLIC_API}/app.bsky.feed.getPostThread",
+            params={"uri": uri, "depth": 0},
+            headers=headers,
+        )
+        resp.raise_for_status()
+
+    thread = resp.json().get("thread", {})
+    post_data = thread.get("post", {})
+    author = post_data.get("author", {})
+    record = post_data.get("record", {})
+
+    image_url = ""
+    embed = post_data.get("embed", {})
+    if embed.get("$type") == "app.bsky.embed.images#view":
+        images = embed.get("images", [])
+        if images:
+            image_url = images[0].get("fullsize", "") or images[0].get("thumb", "")
+
+    posted_date = record.get("createdAt", "")[:10] if record.get("createdAt") else ""
+
+    return {
+        "platform": "bluesky",
+        "original_url": url,
+        "author_handle": f"@{author.get('handle', '')}",
+        "author_name": author.get("displayName", ""),
+        "content": record.get("text", ""),
+        "image_url": image_url,
+        "embed_html": "",
+        "posted_date": posted_date,
     }
 
 

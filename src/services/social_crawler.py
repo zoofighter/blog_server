@@ -1,8 +1,9 @@
 """소셜 계정 기반 크롤러.
 
-등록된 Twitter/Threads 계정의 포스트를 자동으로 수집한다.
+등록된 Twitter/Threads/Bluesky 계정의 포스트를 자동으로 수집한다.
 Twitter: Nitter RSS 피드 (feedparser) + HTML 스크래핑 폴백
-Threads: 프로필 페이지 OG 태그 스크래핑
+Threads: 자동 크롤링 미지원 (수동 URL 등록)
+Bluesky: AT Protocol 공개 API (getAuthorFeed)
 """
 
 import asyncio
@@ -99,6 +100,8 @@ async def crawl_social_account(account: dict, repo: Repository,
         return await _crawl_twitter_account(account, repo, config)
     elif platform == "threads":
         return await _crawl_threads_account(account, repo, config)
+    elif platform == "bluesky":
+        return await _crawl_bluesky_account(account, repo, config)
     else:
         return {"posts_found": 0, "posts_added": 0,
                 "error": f"미지원 플랫폼: {platform}"}
@@ -263,6 +266,77 @@ async def _crawl_threads_account(account: dict, repo: Repository,
         "error": "Threads는 자동 크롤링을 지원하지 않습니다. "
                  "소셜 포스트 > 일괄 URL 크롤링으로 개별 포스트 URL을 등록해주세요.",
     }
+
+
+# --- Bluesky (AT Protocol) ---
+
+BSKY_API = "https://public.api.bsky.app/xrpc"
+
+
+async def _crawl_bluesky_account(account: dict, repo: Repository,
+                                  config: dict) -> dict:
+    """Bluesky 계정 크롤링: AT Protocol 공개 API (getAuthorFeed) 사용."""
+    handle = account["handle"].lstrip("@")
+
+    try:
+        async with httpx.AsyncClient(timeout=20.0) as client:
+            resp = await client.get(
+                f"{BSKY_API}/app.bsky.feed.getAuthorFeed",
+                params={"actor": handle, "limit": 30, "filter": "posts_no_replies"},
+                headers=HEADERS,
+            )
+            resp.raise_for_status()
+    except Exception as e:
+        return {"posts_found": 0, "posts_added": 0,
+                "error": f"Bluesky API 접속 실패: {e}"}
+
+    data = resp.json()
+    feed = data.get("feed", [])
+
+    posts_found = len(feed)
+    posts_added = 0
+
+    for item in feed:
+        post_data = item.get("post", {})
+        author = post_data.get("author", {})
+        record = post_data.get("record", {})
+        uri = post_data.get("uri", "")
+
+        # AT URI -> 웹 URL 변환
+        m = re.match(r"at://([^/]+)/app\.bsky\.feed\.post/(.+)", uri)
+        if not m:
+            continue
+        post_url = f"https://bsky.app/profile/{author.get('handle', '')}/post/{m.group(2)}"
+
+        if repo.social_post_exists_url(post_url):
+            continue
+
+        content = record.get("text", "")
+        posted_date = record.get("createdAt", "")[:10] if record.get("createdAt") else None
+
+        # 이미지 추출
+        image_url = ""
+        embed = post_data.get("embed", {})
+        embed_type = embed.get("$type", "")
+        if embed_type == "app.bsky.embed.images#view":
+            images = embed.get("images", [])
+            if images:
+                image_url = images[0].get("fullsize", "") or images[0].get("thumb", "")
+
+        repo.create_social_post(
+            platform="bluesky",
+            original_url=post_url,
+            author_handle=f"@{author.get('handle', '')}",
+            author_name=author.get("displayName", account.get("display_name", "")),
+            content=content[:2000] if content else None,
+            image_url=image_url or None,
+            embed_html=None,
+            posted_date=posted_date,
+            account_id=account["id"],
+        )
+        posts_added += 1
+
+    return {"posts_found": posts_found, "posts_added": posts_added, "error": None}
 
 
 # --- Helpers ---

@@ -87,6 +87,29 @@ def start_scheduler(repo: Repository, config: dict) -> AsyncIOScheduler:
     return _scheduler
 
 
+def reschedule_jobs(interval_hours: int = None, social_interval_hours: int = None) -> bool:
+    """실행 중인 스케줄러의 크롤링 간격을 변경한다."""
+    global _scheduler
+    if not _scheduler or not _scheduler.running:
+        return False
+
+    if interval_hours is not None and interval_hours > 0:
+        _scheduler.reschedule_job(
+            "rss_crawl",
+            trigger=IntervalTrigger(hours=interval_hours),
+        )
+        logger.info("RSS 크롤링 간격 변경: %d시간", interval_hours)
+
+    if social_interval_hours is not None and social_interval_hours > 0:
+        _scheduler.reschedule_job(
+            "social_crawl",
+            trigger=IntervalTrigger(hours=social_interval_hours),
+        )
+        logger.info("소셜 크롤링 간격 변경: %d시간", social_interval_hours)
+
+    return True
+
+
 def stop_scheduler():
     """스케줄러를 중지한다."""
     global _scheduler

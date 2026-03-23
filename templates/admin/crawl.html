@@ -68,6 +68,17 @@
             스케줄러: {% if scheduler_running %}실행 중{% else %}중지{% endif %}
         </div>
     </div>
+    <form method="post" action="/admin/crawl/schedule" class="flex items-center gap-2 mt-3">
+        <label class="text-sm text-gray-500 dark:text-gray-400">RSS 크롤링 간격:</label>
+        <input type="number" name="interval_hours" min="1" max="72"
+               value="{{ request.app.state.config.get('scheduler', {}).get('interval_hours', 3) }}"
+               class="w-16 px-2 py-1 text-sm rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700">
+        <span class="text-sm text-gray-400">시간</span>
+        <button type="submit" class="px-3 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 rounded hover:bg-gray-200 dark:hover:bg-gray-600">변경</button>
+    </form>
+    {% if request.query_params.get('schedule_updated') %}
+    <p class="text-xs text-green-500 mt-1">스케줄이 변경되었습니다.</p>
+    {% endif %}
 </div>
 
 <!-- 피드 등록 블로그 목록 -->

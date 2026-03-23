@@ -21,7 +21,15 @@ from src.services.social_crawler import (
     crawl_social_account, crawl_all_social_accounts, build_nitter_rss_url,
 )
 
+import yaml
+
 logger = logging.getLogger(__name__)
+
+
+def _save_config(config: dict):
+    """config.yaml 파일을 업데이트한다."""
+    with open("config.yaml", "w", encoding="utf-8") as f:
+        yaml.dump(config, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
 
 router = APIRouter()
 
@@ -82,11 +90,17 @@ async def dashboard(request: Request):
     stats = repo.get_stats()
     crawl_stats = repo.get_crawl_stats()
     recent_logs = repo.get_crawl_logs(limit=10)
+    social_counts = repo.get_social_post_counts()
+    social_crawl_stats = repo.get_social_crawl_stats()
+    recent_social = repo.get_recent_social_posts(limit=5)
     return templates.TemplateResponse("admin/dashboard.html", {
         "request": request,
         "stats": stats,
         "crawl_stats": crawl_stats,
         "recent_logs": recent_logs,
+        "social_counts": social_counts,
+        "social_crawl_stats": social_crawl_stats,
+        "recent_social": recent_social,
     })
 
 
@@ -498,6 +512,23 @@ async def find_blog_feed(request: Request, blog_id: int):
         return JSONResponse({"error": "피드 URL을 찾을 수 없습니다."}, status_code=404)
 
 
+@router.post("/crawl/schedule")
+@require_auth
+async def update_crawl_schedule(request: Request, interval_hours: int = Form(...)):
+    """RSS 크롤링 간격을 변경한다."""
+    if interval_hours < 1 or interval_hours > 72:
+        return RedirectResponse("/admin/crawl?error=invalid_interval", status_code=302)
+
+    config = request.app.state.config
+    config.setdefault("scheduler", {})["interval_hours"] = interval_hours
+    _save_config(config)
+
+    from src.scheduler import reschedule_jobs
+    reschedule_jobs(interval_hours=interval_hours)
+
+    return RedirectResponse("/admin/crawl?schedule_updated=1", status_code=302)
+
+
 @router.post("/blogs/find-all-feeds")
 @require_auth
 async def find_all_feeds(request: Request):
@@ -647,7 +678,7 @@ async def import_social_posts(request: Request, file: UploadFile = File(...)):
     for row in reader:
         url = row.get("original_url", "").strip()
         platform = row.get("platform", "").strip()
-        if not url or platform not in ("twitter", "threads"):
+        if not url or platform not in ("twitter", "threads", "bluesky"):
             continue
         posts.append({
             "platform": platform,
@@ -765,6 +796,9 @@ async def create_social_account_route(
     if platform == "twitter":
         profile_url = f"https://x.com/{clean}"
         feed_url = build_nitter_rss_url(handle)
+    elif platform == "bluesky":
+        profile_url = f"https://bsky.app/profile/{clean}"
+        feed_url = None
     else:
         profile_url = f"https://www.threads.net/@{clean}"
         feed_url = None
@@ -803,6 +837,23 @@ async def delete_social_account_route(request: Request, account_id: int):
     repo = request.app.state.repo
     repo.delete_social_account(account_id)
     return RedirectResponse("/admin/social-accounts", status_code=302)
+
+
+@router.post("/social-accounts/schedule")
+@require_auth
+async def update_social_schedule(request: Request, social_interval_hours: int = Form(...)):
+    """소셜 크롤링 간격을 변경한다."""
+    if social_interval_hours < 1 or social_interval_hours > 72:
+        return RedirectResponse("/admin/social-accounts?error=invalid_interval", status_code=302)
+
+    config = request.app.state.config
+    config.setdefault("scheduler", {})["social_interval_hours"] = social_interval_hours
+    _save_config(config)
+
+    from src.scheduler import reschedule_jobs
+    reschedule_jobs(social_interval_hours=social_interval_hours)
+
+    return RedirectResponse("/admin/social-accounts?schedule_updated=1", status_code=302)
 
 
 @router.post("/social-accounts/crawl/all")
@@ -890,7 +941,7 @@ async def import_social_accounts(request: Request, file: UploadFile = File(...))
     for row in reader:
         handle = row.get("handle", "").strip()
         platform = row.get("platform", "").strip()
-        if not handle or platform not in ("twitter", "threads"):
+        if not handle or platform not in ("twitter", "threads", "bluesky"):
             continue
         if not handle.startswith("@"):
             handle = f"@{handle}"
@@ -898,6 +949,9 @@ async def import_social_accounts(request: Request, file: UploadFile = File(...))
         if platform == "twitter":
             profile_url = f"https://x.com/{clean}"
             feed_url = f"https://nitter.net/{clean}/rss"
+        elif platform == "bluesky":
+            profile_url = f"https://bsky.app/profile/{clean}"
+            feed_url = None
         else:
             profile_url = f"https://www.threads.net/@{clean}"
             feed_url = None

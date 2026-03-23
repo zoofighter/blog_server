@@ -203,6 +203,38 @@ class Repository:
         conn.close()
         return [dict(r) for r in rows]
 
+    def get_posts_by_ids(self, post_ids: list[int]) -> list[dict]:
+        """주어진 ID 목록에 해당하는 블로그 포스트를 반환한다."""
+        if not post_ids:
+            return []
+        conn = self._conn()
+        placeholders = ",".join("?" for _ in post_ids)
+        rows = conn.execute(
+            f"""SELECT p.*, b.name as blog_name
+                FROM posts p
+                LEFT JOIN blogs b ON p.blog_id = b.id
+                WHERE p.id IN ({placeholders})
+                ORDER BY p.published_date DESC""",
+            post_ids,
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
+    def get_social_posts_by_ids(self, post_ids: list[int]) -> list[dict]:
+        """주어진 ID 목록에 해당하는 소셜 포스트를 반환한다."""
+        if not post_ids:
+            return []
+        conn = self._conn()
+        placeholders = ",".join("?" for _ in post_ids)
+        rows = conn.execute(
+            f"""SELECT * FROM social_posts
+                WHERE id IN ({placeholders})
+                ORDER BY posted_date DESC""",
+            post_ids,
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
     # --- tags ---
 
     def create_or_get_tag(self, name: str) -> int:
@@ -362,6 +394,7 @@ class Repository:
         return post_id
 
     def get_social_posts(self, platform: str = None, account_id: int = None,
+                         search: str = None,
                          page: int = 1, per_page: int = 30) -> tuple[list[dict], int]:
         conn = self._conn()
         conditions = []
@@ -373,6 +406,9 @@ class Repository:
         if account_id:
             conditions.append("account_id = ?")
             params.append(account_id)
+        if search:
+            conditions.append("(content LIKE ? OR author_handle LIKE ? OR author_name LIKE ?)")
+            params.extend([f"%{search}%", f"%{search}%", f"%{search}%"])
 
         where = "WHERE " + " AND ".join(conditions) if conditions else ""
 
@@ -448,6 +484,18 @@ class Repository:
         conn.close()
         return count
 
+    def get_recent_social_posts(self, limit: int = 5) -> list[dict]:
+        conn = self._conn()
+        rows = conn.execute(
+            """SELECT id, platform, author_handle, content, posted_date, created_at
+               FROM social_posts
+               ORDER BY created_at DESC
+               LIMIT ?""",
+            (limit,),
+        ).fetchall()
+        conn.close()
+        return [dict(r) for r in rows]
+
     def get_social_post_counts(self) -> dict:
         conn = self._conn()
         total = conn.execute("SELECT COUNT(*) FROM social_posts").fetchone()[0]
@@ -457,8 +505,11 @@ class Repository:
         threads = conn.execute(
             "SELECT COUNT(*) FROM social_posts WHERE platform = 'threads'"
         ).fetchone()[0]
+        bluesky = conn.execute(
+            "SELECT COUNT(*) FROM social_posts WHERE platform = 'bluesky'"
+        ).fetchone()[0]
         conn.close()
-        return {"total": total, "twitter": twitter, "threads": threads}
+        return {"total": total, "twitter": twitter, "threads": threads, "bluesky": bluesky}
 
     # --- social accounts ---
 
